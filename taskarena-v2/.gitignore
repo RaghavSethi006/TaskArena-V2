@@ -1,0 +1,35 @@
+﻿# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Data — never commit
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Models — too large
+models/*.gguf
+models/scibert/
+
+# Secrets
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.tauri/
+
+# Tauri
+frontend/src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,40 @@
+﻿# Python
+**/.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Local data and databases
+taskarena-v2/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local AI models / heavy artifacts
+taskarena-v2/models/*.gguf
+taskarena-v2/models/scibert/
+
+# Secrets and local runtime files
+**/.env
+taskarena-v2/.chat_payload.json
+taskarena-v2/*.log
+taskarena-v2/.*_uvicorn_*.log
+
+# Frontend / Node / Tauri
+taskarena-v2/frontend/node_modules/
+taskarena-v2/frontend/dist/
+taskarena-v2/frontend/.tauri/
+taskarena-v2/frontend/src-tauri/target/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Generated workspace dumps
+repo_dump.md
