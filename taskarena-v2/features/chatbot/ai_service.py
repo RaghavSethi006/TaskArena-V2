@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import AsyncGenerator
@@ -113,37 +115,44 @@ class GroqAI(BaseAI):
         self.model = model
 
     def _build_messages(self, messages, context="", system=""):
-        sys_content = system or "You are a helpful AI tutor for students."
+        sys_content = system or DEFAULT_SYSTEM_PROMPT
         if context:
             sys_content += f"\n\nRelevant context from the student's notes:\n{context}"
         return [{"role": "system", "content": sys_content}] + messages
 
     async def stream(self, messages, context="", system=""):
         full_messages = self._build_messages(messages, context, system)
+        queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
 
         def _sync_stream():
-            """Run sync Groq streaming in a thread — avoids Windows asyncio conflict."""
-            tokens = []
-            with self.client.chat.completions.create(
-                model=self.model,
-                messages=full_messages,
-                stream=True,
-                temperature=0.7,
-                max_tokens=1024,
-            ) as response:
-                for chunk in response:
-                    token = chunk.choices[0].delta.content
-                    if token:
-                        tokens.append(token)
-            return tokens
+            try:
+                with self.client.chat.completions.create(
+                    model=self.model,
+                    messages=full_messages,
+                    stream=True,
+                    temperature=0.7,
+                    max_tokens=1024,
+                ) as response:
+                    for chunk in response:
+                        token = chunk.choices[0].delta.content
+                        if token:
+                            loop.call_soon_threadsafe(queue.put_nowait, ("token", token))
+            except Exception as exc:
+                loop.call_soon_threadsafe(queue.put_nowait, ("error", exc))
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, ("done", None))
 
-        # Run sync streaming in thread pool, then yield results
-        # This avoids the httpx AsyncClient / Windows event loop conflict
-        import asyncio
+        threading.Thread(target=_sync_stream, daemon=True).start()
 
-        tokens = await asyncio.to_thread(_sync_stream)
-        for token in tokens:
-            yield token
+        while True:
+            kind, payload = await queue.get()
+            if kind == "token":
+                yield str(payload)
+                continue
+            if kind == "error":
+                raise payload if isinstance(payload, Exception) else RuntimeError(str(payload))
+            break
 
     async def complete(self, messages, context="", system="", max_tokens=1024):
         full_messages = self._build_messages(messages, context, system)
@@ -221,7 +230,7 @@ def get_ai(provider: str, **kwargs) -> BaseAI:
     if provider == "local":
         return LocalAI()
     if provider == "groq":
-        return GroqAI(model=kwargs.get("model", settings.groq_model))
+        return GroqAI(model=kwargs.get("model") or settings.groq_model)
     if provider == "ollama":
         return OllamaAI(model=kwargs.get("model", settings.ollama_model))
     raise ValueError(

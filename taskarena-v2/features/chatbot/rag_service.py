@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
 import features.chatbot.models  # noqa: F401
@@ -8,6 +10,8 @@ import features.quiz.models  # noqa: F401
 import features.schedule.models  # noqa: F401
 import features.tasks.models  # noqa: F401
 import shared.user_model  # noqa: F401
+
+LOGGER = logging.getLogger(__name__)
 
 
 class RAGService:
@@ -46,14 +50,18 @@ class RAGService:
         if course_id is None and folder_id is None and file_id is None:
             return ""
 
-        results = self.indexer.search(
-            query=query,
-            db=self.db,
-            course_id=course_id,
-            folder_id=folder_id,
-            file_id=file_id,
-            top_k=top_k,
-        )
+        try:
+            results = self.indexer.search(
+                query=query,
+                db=self.db,
+                course_id=course_id,
+                folder_id=folder_id,
+                file_id=file_id,
+                top_k=top_k,
+            )
+        except Exception as exc:
+            LOGGER.warning("RAG search failed; continuing without context: %s", exc)
+            return ""
         if not results:
             return ""
 
@@ -83,14 +91,18 @@ class RAGService:
         if course_id is None and folder_id is None and file_id is None:
             return []
 
-        results = self.indexer.search(
-            query=query,
-            db=self.db,
-            course_id=course_id,
-            folder_id=folder_id,
-            file_id=file_id,
-            top_k=top_k,
-        )
+        try:
+            results = self.indexer.search(
+                query=query,
+                db=self.db,
+                course_id=course_id,
+                folder_id=folder_id,
+                file_id=file_id,
+                top_k=top_k,
+            )
+        except Exception as exc:
+            LOGGER.warning("RAG source lookup failed; returning no sources: %s", exc)
+            return []
         if not results:
             return []
 

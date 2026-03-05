@@ -1,4 +1,4 @@
-﻿import json
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
@@ -136,9 +136,6 @@ async def send_message(
                 provider=body.provider,
                 model=body.model,
             ):
-                if await request.is_disconnected():
-                    break
-
                 if isinstance(token, dict):
                     sources = token.get("sources", [])
                     data = json.dumps(
