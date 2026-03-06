@@ -1,16 +1,20 @@
-import { create } from "zustand"
+﻿import { create } from "zustand"
+import { persist } from "zustand/middleware"
 
-interface UiStore {
+interface UIStore {
   sidebarCollapsed: boolean
-  searchOpen: boolean
   toggleSidebar: () => void
-  setSearchOpen: (open: boolean) => void
+  setSidebarCollapsed: (v: boolean) => void
 }
 
-export const useUiStore = create<UiStore>((set) => ({
-  sidebarCollapsed: false,
-  searchOpen: false,
-  toggleSidebar: () =>
-    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
-  setSearchOpen: (open) => set({ searchOpen: open }),
-}))
+export const useUIStore = create<UIStore>()(
+  persist(
+    (set) => ({
+      sidebarCollapsed: false,
+      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+    }),
+    { name: "taskarena-ui" }
+  )
+)
+

@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-type ToolId = "pomodoro" | "stopwatch" | "calculator" | "notes" | "todo" | "links"
+export type ToolId = "pomodoro" | "stopwatch" | "calculator" | "notes" | "todo" | "links"
 type ToolState = "closed" | "docked" | "floating"
 
 interface ToolEntry {
@@ -167,7 +167,10 @@ export const useToolsStore = create<ToolsStore>()(
           stopwatch: { running: false, startedAt: null, elapsed: 0, laps: [] },
         })),
 
-      stopwatchTick: () => set((s) => s),
+      stopwatchTick: () =>
+        set((s) => ({
+          stopwatch: { ...s.stopwatch },
+        })),
     }),
     {
       name: "taskarena-tools",
