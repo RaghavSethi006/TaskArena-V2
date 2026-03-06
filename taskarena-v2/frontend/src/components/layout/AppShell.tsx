@@ -1,23 +1,42 @@
-import type { ReactNode } from "react"
+﻿import type { ReactNode } from "react"
+import FloatingTool from "@/components/layout/FloatingTool"
+import RightPanel from "@/components/layout/RightPanel"
+import Sidebar from "@/components/layout/Sidebar"
+import Topbar from "@/components/layout/Topbar"
+import { TOOL_DEFINITIONS } from "@/components/layout/toolRegistry"
+import { useToolsStore } from "@/stores/toolsStore"
 
 interface AppShellProps {
   children: ReactNode
 }
 
+function FloatingToolsLayer() {
+  const { tools } = useToolsStore()
+
+  return (
+    <>
+      {TOOL_DEFINITIONS.map(({ id, label, icon, component: ToolComponent, minWidth }) =>
+        tools[id].state === "floating" ? (
+          <FloatingTool key={id} id={id} label={label} icon={icon} minWidth={minWidth}>
+            <ToolComponent />
+          </FloatingTool>
+        ) : null
+      )}
+    </>
+  )
+}
+
 export default function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg">
-      <div className="w-[220px] min-w-[220px] bg-s1 border-r border-b1 flex-shrink-0">
-        <div className="p-4 text-tx3 text-xs font-mono">Sidebar - Phase 3B</div>
+      <Sidebar />
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+        <Topbar />
+        <main className="flex-1 overflow-y-auto bg-bg p-6">{children}</main>
       </div>
-
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="h-[50px] bg-s1 border-b border-b1 flex items-center px-4 text-tx3 text-xs font-mono flex-shrink-0">
-          Topbar - Phase 3B
-        </div>
-
-        <main className="flex-1 overflow-y-auto bg-bg">{children}</main>
-      </div>
+      <RightPanel />
+      <FloatingToolsLayer />
     </div>
   )
 }
+
