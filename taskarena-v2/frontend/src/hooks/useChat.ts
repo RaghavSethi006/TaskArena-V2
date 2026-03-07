@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import type { Conversation, Message } from "@/types"
 
@@ -6,6 +6,7 @@ export function useConversations() {
   return useQuery({
     queryKey: ["chat", "conversations"],
     queryFn: () => api.get<Conversation[]>("/chat/conversations"),
+    placeholderData: keepPreviousData,
   })
 }
 

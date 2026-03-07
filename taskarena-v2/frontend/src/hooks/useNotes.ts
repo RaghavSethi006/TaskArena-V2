@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import type { Course, File, Folder } from "@/types"
 
@@ -13,6 +13,7 @@ export function useCourses() {
   return useQuery({
     queryKey: ["notes", "courses"],
     queryFn: () => api.get<Course[]>("/notes/courses"),
+    placeholderData: keepPreviousData,
   })
 }
 

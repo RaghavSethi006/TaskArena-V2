@@ -80,7 +80,8 @@ export default function TasksPage() {
     course_id: "",
   })
 
-  const tasksQuery = useTasks({ type: filters.type, status: filters.status })
+  const effectiveStatus = view === "kanban" ? "" : filters.status
+  const tasksQuery = useTasks({ type: filters.type, status: effectiveStatus })
   const coursesQuery = useQuery({
     queryKey: ["courses"],
     queryFn: () => api.get<Course[]>("/notes/courses"),
@@ -123,6 +124,7 @@ export default function TasksPage() {
   }
 
   const handleDelete = async (id: number) => {
+    if (!window.confirm("Delete this task? This cannot be undone.")) return
     try {
       await deleteTask.mutateAsync(id)
       toast.success("Task deleted")
@@ -269,7 +271,9 @@ export default function TasksPage() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
           {KANBAN_TYPES.map((column) => {
             const columnTasks = filteredTasks.filter((task) => task.type === column.key)
-            const pendingCount = columnTasks.filter((task) => task.status === "pending").length
+            const columnPending = columnTasks.filter((task) => task.status === "pending")
+            const columnCompleted = columnTasks.filter((task) => task.status === "completed")
+            const pendingCount = columnPending.length
             return (
               <div key={column.key} className="rounded-[10px] border border-b1 bg-s1 p-3">
                 <div className="flex items-center justify-between mb-3">
@@ -280,9 +284,21 @@ export default function TasksPage() {
                   </div>
                 </div>
                 <div className="space-y-2 min-h-[220px]">
-                  {columnTasks.map((task) => (
+                  {columnPending.map((task) => (
                     <TaskCard key={task.id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={handleFocus} />
                   ))}
+                  {columnCompleted.length > 0 ? (
+                    <div className="mt-2 border-t border-b1 pt-2">
+                      <p className="mb-1.5 text-[10px] text-tx3 font-mono">
+                        {columnCompleted.length} completed
+                      </p>
+                      {columnCompleted.map((task) => (
+                        <div key={task.id} className="opacity-40">
+                          <TaskCard task={task} onComplete={() => {}} onDelete={handleDelete} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="mt-3 border border-dashed border-b1 rounded-[7px] p-2 flex items-center gap-2">
                   <input

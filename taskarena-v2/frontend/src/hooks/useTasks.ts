@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../api/client"
 import type { Task, TaskCreate } from "../types"
 
@@ -17,6 +17,7 @@ export function useTasks(filters?: TaskFilters) {
   return useQuery({
     queryKey: ["tasks", filters],
     queryFn: () => api.get<Task[]>(`/tasks${qs}`),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -33,6 +34,21 @@ export function useCompleteTask() {
   return useMutation({
     mutationFn: (id: number) =>
       api.post<{ task: Task; xp_earned: number; new_total_xp: number }>(`/tasks/${id}/complete`, {}),
+    onMutate: async (id: number) => {
+      await qc.cancelQueries({ queryKey: ["tasks"] })
+      const snapshots = qc.getQueriesData<Task[]>({ queryKey: ["tasks"] })
+      qc.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
+        old?.map((task) =>
+          task.id === id
+            ? { ...task, status: "completed", completed_at: new Date().toISOString() }
+            : task
+        )
+      )
+      return { snapshots }
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] })
       qc.invalidateQueries({ queryKey: ["stats"] })
