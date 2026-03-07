@@ -17,6 +17,31 @@ export function useCourses() {
   })
 }
 
+export function useCreateCourse() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; code?: string; color: string }) =>
+      api.post<Course>("/notes/courses", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notes", "courses"] })
+      qc.invalidateQueries({ queryKey: ["study-hub", "courses"] })
+    },
+  })
+}
+
+export function useDeleteCourse() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/notes/courses/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notes", "courses"] })
+      qc.invalidateQueries({ queryKey: ["study-hub", "courses"] })
+      qc.invalidateQueries({ queryKey: ["study-hub"] })
+      qc.invalidateQueries({ queryKey: ["quizzes"] })
+    },
+  })
+}
+
 export function useFolders(courseId: number | null) {
   return useQuery({
     queryKey: ["notes", "folders", courseId],

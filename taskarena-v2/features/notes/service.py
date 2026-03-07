@@ -93,7 +93,12 @@ class NotesService:
         return course
 
     def delete_course(self, course_id: int) -> None:
+        from features.quiz.models import Quiz
+
         course = self.get_course(course_id)
+        self.db.query(Quiz).filter(Quiz.course_id == course_id).delete(
+            synchronize_session=False
+        )
         self.db.delete(course)
         self.db.commit()
 
