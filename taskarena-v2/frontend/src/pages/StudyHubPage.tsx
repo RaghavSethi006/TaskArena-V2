@@ -1,4 +1,4 @@
-import { Brain, Plus, Trash2 } from "lucide-react"
+import { Brain, Plus, ScrollText, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { getBaseApiUrl } from "@/api/client"
 import EmptyState from "@/components/shared/EmptyState"
@@ -56,7 +56,9 @@ export default function StudyHubPage() {
   const quizDetailQuery = useQuizDetail(takingQuizId)
   const submitAttempt = useSubmitAttempt()
   const foldersQuery = useFolders(selectedCourse?.id ?? null)
-  const filesQuery = useFiles(scope === "file" && folderId ? Number(folderId) : scope === "folder" && folderId ? Number(folderId) : null)
+  const filesQuery = useFiles(
+    scope === "file" && folderId ? Number(folderId) : scope === "folder" && folderId ? Number(folderId) : null
+  )
 
   const questions = quizDetailQuery.data?.questions ?? []
   const question = questions[currentQuestion]
@@ -113,7 +115,13 @@ export default function StudyHubPage() {
         buffer = lines.pop() ?? ""
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue
-          const data = JSON.parse(line.slice(6)) as { step?: string; progress?: number; total?: number; done?: boolean; error?: string }
+          const data = JSON.parse(line.slice(6)) as {
+            step?: string
+            progress?: number
+            total?: number
+            done?: boolean
+            error?: string
+          }
           if (data.step) setGenSteps((prev) => [...prev, `${data.step} (${data.progress}/${data.total})`])
           if (data.done) {
             toast.success("Quiz generated")
@@ -189,11 +197,19 @@ export default function StudyHubPage() {
         subtitle={`Study Hub > ${selectedCourse.name}`}
         actions={
           <>
-            <button type="button" onClick={() => setGenerateOpen(true)} className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 inline-flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setGenerateOpen(true)}
+              className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 inline-flex items-center gap-1.5"
+            >
               <Plus className="w-3.5 h-3.5" />
               Generate
             </button>
-            <button type="button" onClick={() => setSelectedCourse(null)} className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3">
+            <button
+              type="button"
+              onClick={() => setSelectedCourse(null)}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3"
+            >
               Back
             </button>
           </>
@@ -221,76 +237,193 @@ export default function StudyHubPage() {
         <EmptyState title="No quizzes yet" description="Generate your first quiz from this course." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {(quizzesQuery.data ?? []).map((quiz) => (
-            <div key={quiz.id} className="rounded-[10px] border border-b1 bg-s1 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-[13px] font-semibold">{quiz.title}</h3>
-                <button type="button" onClick={() => void deleteQuiz.mutateAsync(quiz.id)} className="text-tx3 hover:text-rose-300">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+          {(quizzesQuery.data ?? []).map((quiz) => {
+            const scoreColor =
+              quiz.best_score === null ? "text-tx3"
+              : quiz.best_score >= 80 ? "text-green-400"
+              : quiz.best_score >= 60 ? "text-amber-400"
+              : "text-rose-400"
+
+            return (
+              <div
+                key={quiz.id}
+                className="rounded-[12px] border border-b1 bg-s1 overflow-hidden hover:border-b2 transition-colors"
+              >
+                <div
+                  className={`h-1 ${
+                    quiz.difficulty === "easy"
+                      ? "bg-green-500"
+                      : quiz.difficulty === "medium"
+                        ? "bg-amber-500"
+                        : "bg-rose-500"
+                  }`}
+                />
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[13px] font-semibold text-tx truncate">{quiz.title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] uppercase ${
+                            quiz.difficulty === "easy"
+                              ? "bg-green-500/15 text-green-400"
+                              : quiz.difficulty === "medium"
+                                ? "bg-amber-500/15 text-amber-400"
+                                : "bg-rose-500/15 text-rose-400"
+                          }`}
+                        >
+                          {quiz.difficulty}
+                        </span>
+                        <span className="text-[10px] text-tx3 font-mono">{quiz.question_count} questions</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void deleteQuiz.mutateAsync(quiz.id)}
+                      className="text-tx3 hover:text-rose-300 transition-colors flex-shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="rounded-[7px] bg-s2/60 border border-b1 p-2">
+                      <p className="text-[10px] text-tx3 font-mono">Best Score</p>
+                      <p className={`text-[16px] font-bold font-mono mt-0.5 ${scoreColor}`}>
+                        {quiz.best_score !== null ? `${quiz.best_score.toFixed(0)}%` : "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-[7px] bg-s2/60 border border-b1 p-2">
+                      <p className="text-[10px] text-tx3 font-mono">Attempts</p>
+                      <p className="text-[16px] font-bold font-mono text-tx mt-0.5">{quiz.attempt_count}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => startQuiz(quiz.id)}
+                    className="h-8 w-full rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <ScrollText className="w-3.5 h-3.5" />
+                    {quiz.attempt_count > 0 ? "Retake Quiz" : "Start Quiz"}
+                  </button>
+                </div>
               </div>
-              <p className="mt-1 text-[11px] text-tx3">
-                {quiz.difficulty} · {quiz.question_count}q · {quiz.attempt_count} attempts
-              </p>
-              <p className="mt-1 text-[11px] text-tx3">Best score: {quiz.best_score ?? "N/A"}</p>
-              <button type="button" onClick={() => startQuiz(quiz.id)} className="mt-3 h-8 w-full rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600">
-                Start Quiz
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
         <DialogContent className="bg-s1 border-b1 rounded-[12px]">
-          <DialogHeader><DialogTitle>Generate Quiz</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Generate Quiz</DialogTitle>
+          </DialogHeader>
           <div className="space-y-2">
             <div className="text-[12px] text-tx2">Scope</div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setScope("course")} className={`h-7 px-2 rounded-[7px] text-[11px] ${scope === "course" ? "bg-blue-500 text-white" : "bg-s2 border border-b1 text-tx2"}`}>Whole course</button>
-              <button type="button" onClick={() => setScope("folder")} className={`h-7 px-2 rounded-[7px] text-[11px] ${scope === "folder" ? "bg-blue-500 text-white" : "bg-s2 border border-b1 text-tx2"}`}>Specific folder</button>
-              <button type="button" onClick={() => setScope("file")} className={`h-7 px-2 rounded-[7px] text-[11px] ${scope === "file" ? "bg-blue-500 text-white" : "bg-s2 border border-b1 text-tx2"}`}>Specific file</button>
+              <button
+                type="button"
+                onClick={() => setScope("course")}
+                className={`h-7 px-2 rounded-[7px] text-[11px] ${scope === "course" ? "bg-blue-500 text-white" : "bg-s2 border border-b1 text-tx2"}`}
+              >
+                Whole course
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("folder")}
+                className={`h-7 px-2 rounded-[7px] text-[11px] ${scope === "folder" ? "bg-blue-500 text-white" : "bg-s2 border border-b1 text-tx2"}`}
+              >
+                Specific folder
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("file")}
+                className={`h-7 px-2 rounded-[7px] text-[11px] ${scope === "file" ? "bg-blue-500 text-white" : "bg-s2 border border-b1 text-tx2"}`}
+              >
+                Specific file
+              </button>
             </div>
             {scope === "folder" || scope === "file" ? (
-              <select value={folderId} onChange={(e) => setFolderId(e.target.value)} className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx">
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+              >
                 <option value="">Select folder</option>
                 {(foldersQuery.data ?? []).map((folder) => (
-                  <option key={folder.id} value={String(folder.id)}>{folder.name}</option>
+                  <option key={folder.id} value={String(folder.id)}>
+                    {folder.name}
+                  </option>
                 ))}
               </select>
             ) : null}
             {scope === "file" ? (
-              <select value={fileId} onChange={(e) => setFileId(e.target.value)} className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx">
+              <select
+                value={fileId}
+                onChange={(e) => setFileId(e.target.value)}
+                className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+              >
                 <option value="">Select file</option>
                 {(filesQuery.data ?? []).map((file) => (
-                  <option key={file.id} value={String(file.id)}>{file.name}</option>
+                  <option key={file.id} value={String(file.id)}>
+                    {file.name}
+                  </option>
                 ))}
               </select>
             ) : null}
             <div className="grid grid-cols-3 gap-2">
-              <select value={provider} onChange={(e) => setProvider(e.target.value as "groq" | "local" | "ollama")} className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx">
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as "groq" | "local" | "ollama")}
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+              >
                 <option value="groq">Groq</option>
                 <option value="local">Local</option>
                 <option value="ollama">Ollama</option>
               </select>
-              <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")} className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx">
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+              >
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
                 <option value="hard">Hard</option>
               </select>
-              <input value={String(nQuestions)} onChange={(e) => setNQuestions(Number(e.target.value || 10))} type="number" min={5} max={30} className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx outline-none" />
+              <input
+                value={String(nQuestions)}
+                onChange={(e) => setNQuestions(Number(e.target.value || 10))}
+                type="number"
+                min={5}
+                max={30}
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx outline-none"
+              />
             </div>
             {genSteps.length > 0 ? (
               <div className="rounded-[7px] border border-b1 bg-s2/40 p-2 max-h-[110px] overflow-y-auto">
                 {genSteps.map((step, idx) => (
-                  <p key={`${step}-${idx}`} className="text-[11px] text-tx2">{step}</p>
+                  <p key={`${step}-${idx}`} className="text-[11px] text-tx2">
+                    {step}
+                  </p>
                 ))}
               </div>
             ) : null}
           </div>
           <DialogFooter>
-            <button type="button" onClick={() => setGenerateOpen(false)} className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3">Cancel</button>
-            <button type="button" onClick={() => void runGeneration()} disabled={generating} className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40">
+            <button
+              type="button"
+              onClick={() => setGenerateOpen(false)}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void runGeneration()}
+              disabled={generating}
+              className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
+            >
               {generating ? "Generating..." : "Generate"}
             </button>
           </DialogFooter>
@@ -302,18 +435,26 @@ export default function StudyHubPage() {
           <div className="max-w-3xl mx-auto rounded-[10px] border border-b1 bg-s1 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[15px] font-semibold">{quizDetailQuery.data?.quiz.title ?? "Quiz"}</h3>
-              <button type="button" onClick={() => setTakingQuizId(null)} className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3">Close</button>
+              <button
+                type="button"
+                onClick={() => setTakingQuizId(null)}
+                className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3"
+              >
+                Close
+              </button>
             </div>
             {quizResult ? (
               <div className="rounded-[10px] border border-b1 bg-s2/40 p-4">
                 <p className="text-[16px] font-semibold">Score: {quizResult.score.toFixed(1)}%</p>
                 <p className="text-[12px] text-tx2 mt-1">
-                  {quizResult.correct}/{quizResult.total} correct · +{quizResult.xp_earned} XP
+                  {quizResult.correct}/{quizResult.total} correct - +{quizResult.xp_earned} XP
                 </p>
               </div>
             ) : question ? (
               <div>
-                <p className="text-[12px] text-tx3 font-mono mb-2">Q {currentQuestion + 1} of {questions.length}</p>
+                <p className="text-[12px] text-tx3 font-mono mb-2">
+                  Q {currentQuestion + 1} of {questions.length}
+                </p>
                 <p className="text-[14px] text-tx mb-3">{question.question}</p>
                 <div className="space-y-2">
                   {(["a", "b", "c", "d"] as const).map((key) => {
@@ -335,11 +476,19 @@ export default function StudyHubPage() {
                 </div>
                 <div className="mt-3 flex justify-end">
                   {currentQuestion < questions.length - 1 ? (
-                    <button type="button" onClick={() => setCurrentQuestion((v) => v + 1)} className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentQuestion((value) => value + 1)}
+                      className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600"
+                    >
                       Next
                     </button>
                   ) : (
-                    <button type="button" onClick={() => void submitQuiz()} className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600">
+                    <button
+                      type="button"
+                      onClick={() => void submitQuiz()}
+                      className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600"
+                    >
                       Finish Quiz
                     </button>
                   )}
