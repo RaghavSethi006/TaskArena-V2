@@ -5,7 +5,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import MessageBubble from "@/components/shared/MessageBubble"
 import ProviderBadge from "@/components/shared/ProviderBadge"
 import EmptyState from "@/components/shared/EmptyState"
-import { api, BASE_API } from "@/api/client"
+import { api, getBaseApiUrl } from "@/api/client"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { useConversations, useCreateConversation, useDeleteConversation, useMessages, useUpdateContext } from "@/hooks/useChat"
@@ -136,7 +136,8 @@ export default function ChatbotPage() {
     setStreamingContent("")
 
     try {
-      const response = await fetch(`${BASE_API}/chat/conversations/${activeConvId}/messages`, {
+      const baseApiUrl = await getBaseApiUrl()
+      const response = await fetch(`${baseApiUrl}/chat/conversations/${activeConvId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, provider, model }),
@@ -239,10 +240,24 @@ export default function ChatbotPage() {
 
         <section className="flex flex-col min-h-0">
           <div className="h-[50px] border-b border-b1 px-3 flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-[13px] font-semibold">{activeConversation?.title ?? "AI Tutor"}</h2>
-              <button type="button" className="text-[10px] text-tx3 hover:text-tx2" onClick={() => setContextOpen(true)}>
-                Set context
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-[13px] font-semibold truncate">{activeConversation?.title ?? "AI Tutor"}</h2>
+              <button
+                type="button"
+                onClick={() => setContextOpen(true)}
+                className={`h-6 px-2 rounded-[5px] border text-[10px] font-mono flex items-center gap-1 flex-shrink-0 transition-colors ${
+                  activeConversation?.context_course_id
+                    ? "border-blue-500/30 bg-[var(--bd)] text-blue-300"
+                    : "border-b1 bg-s2 text-tx3 hover:bg-s3"
+                }`}
+              >
+                {activeConversation?.context_file_id
+                  ? "📄 File context"
+                  : activeConversation?.context_folder_id
+                    ? "📁 Folder context"
+                    : activeConversation?.context_course_id
+                      ? "📚 Course context"
+                      : "⚪ No context"}
               </button>
             </div>
             <div className="flex items-center gap-2">
@@ -286,6 +301,12 @@ export default function ChatbotPage() {
               </>
             )}
           </div>
+
+          {activeConversation?.context_course_id ? (
+            <div className="px-3 py-1.5 border-b border-b1 bg-s2/30 text-[10px] text-blue-300 font-mono">
+              RAG active - searching your notes for context
+            </div>
+          ) : null}
 
           <div className="border-t border-b1 p-3 flex items-end gap-2 bg-s1">
             <button
