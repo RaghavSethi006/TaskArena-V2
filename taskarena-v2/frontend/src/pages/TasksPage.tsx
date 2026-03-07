@@ -1,7 +1,7 @@
 import { addDays, isToday, isWithinInterval, parseISO, startOfDay } from "date-fns"
 import { Filter, LayoutGrid, List, Plus } from "lucide-react"
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import EmptyState from "@/components/shared/EmptyState"
 import LoadingSkeleton from "@/components/shared/LoadingSkeleton"
 import PageHeader from "@/components/shared/PageHeader"
@@ -82,6 +82,7 @@ export default function TasksPage() {
 
   const effectiveStatus = view === "kanban" ? "" : filters.status
   const tasksQuery = useTasks({ type: filters.type, status: effectiveStatus })
+  const qc = useQueryClient()
   const coursesQuery = useQuery({
     queryKey: ["courses"],
     queryFn: () => api.get<Course[]>("/notes/courses"),
@@ -171,8 +172,31 @@ export default function TasksPage() {
       points: newTask.points,
       course_id: newTask.course_id ? Number(newTask.course_id) : undefined,
     }
-    await createTask.mutateAsync(payload)
+    const task = await createTask.mutateAsync(payload)
     toast.success("Task created")
+
+    if (newTask.deadline) {
+      try {
+        const eventType =
+          newTask.type === "assignment"
+            ? "assignment"
+            : newTask.type === "study"
+              ? "study"
+              : "other"
+
+        await api.post("/schedule", {
+          title: newTask.title.trim(),
+          type: eventType,
+          date: newTask.deadline,
+          course_id: task.course_id ?? null,
+          notes: `Auto-synced from task #${task.id}`,
+        })
+        qc.invalidateQueries({ queryKey: ["schedule"] })
+      } catch {
+        // Schedule sync is best-effort and should not block task creation.
+      }
+    }
+
     setAddModalOpen(false)
     setNewTask({ title: "", type: "assignment", subject: "", deadline: "", points: 5, course_id: "" })
   }
