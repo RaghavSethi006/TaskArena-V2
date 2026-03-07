@@ -37,10 +37,12 @@ export interface TaskCreate {
 export interface Course {
   id: number
   name: string
-  code: string
+  code: string | null
   color: string
   user_id: number
   created_at: string
+  folder_count?: number
+  file_count?: number
   quiz_count?: number
 }
 

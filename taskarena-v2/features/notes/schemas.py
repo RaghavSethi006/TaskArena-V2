@@ -23,6 +23,8 @@ class CourseOut(BaseModel):
     code: Optional[str]
     color: str
     created_at: datetime
+    folder_count: int = 0
+    file_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

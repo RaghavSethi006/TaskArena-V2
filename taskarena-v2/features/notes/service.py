@@ -25,12 +25,45 @@ class NotesService:
 
     # -- Courses --
     def get_courses(self, user_id: int) -> list[Course]:
-        return (
+        courses = (
             self.db.query(Course)
             .filter(Course.user_id == user_id)
             .order_by(Course.name.asc(), Course.id.asc())
             .all()
         )
+        if not courses:
+            return courses
+
+        course_ids = [course.id for course in courses]
+
+        folder_rows = (
+            self.db.query(
+                Folder.course_id.label("course_id"),
+                func.count(Folder.id).label("cnt"),
+            )
+            .filter(Folder.course_id.in_(course_ids))
+            .group_by(Folder.course_id)
+            .all()
+        )
+        folder_counts = {row.course_id: int(row.cnt) for row in folder_rows}
+
+        file_rows = (
+            self.db.query(
+                Folder.course_id.label("course_id"),
+                func.count(File.id).label("cnt"),
+            )
+            .join(File, File.folder_id == Folder.id)
+            .filter(Folder.course_id.in_(course_ids))
+            .group_by(Folder.course_id)
+            .all()
+        )
+        file_counts = {row.course_id: int(row.cnt) for row in file_rows}
+
+        for course in courses:
+            course.folder_count = folder_counts.get(course.id, 0)
+            course.file_count = file_counts.get(course.id, 0)
+
+        return courses
 
     def get_course(self, course_id: int) -> Course:
         course = self.db.get(Course, course_id)

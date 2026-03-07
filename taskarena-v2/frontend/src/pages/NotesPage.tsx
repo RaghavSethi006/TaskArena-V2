@@ -122,13 +122,14 @@ export default function NotesPage() {
                 <div className="p-4">
                   <p className="text-[14px] font-semibold text-tx">{course.name}</p>
                   <p className="text-[11px] text-tx3 font-mono mt-0.5">{course.code}</p>
-                  {/* TODO: replace "-" with real counts once GET /api/notes/courses/summary is added */}
                   <div className="mt-3 flex items-center gap-3 text-[11px] text-tx3 font-mono">
                     <span className="flex items-center gap-1">
-                      <FolderIcon className="w-3 h-3" /> - folders
+                      <FolderIcon className="w-3 h-3" />
+                      {course.folder_count ?? 0} {course.folder_count === 1 ? "folder" : "folders"}
                     </span>
                     <span className="flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> - files
+                      <FileText className="w-3 h-3" />
+                      {course.file_count ?? 0} {course.file_count === 1 ? "file" : "files"}
                     </span>
                   </div>
                 </div>
