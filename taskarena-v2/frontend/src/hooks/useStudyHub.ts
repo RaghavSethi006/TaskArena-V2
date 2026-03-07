@@ -12,6 +12,14 @@ interface QuizGenerateRequest {
   file_id?: number
 }
 
+interface QuestionResult {
+  question_id: number
+  correct: boolean
+  chosen: string
+  answer: string
+  explanation: string
+}
+
 export function useStudyHubCourses() {
   return useQuery({
     queryKey: ["study-hub", "courses"],
@@ -58,6 +66,7 @@ export function useDeleteQuiz() {
 }
 
 export function useSubmitAttempt() {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ quizId, answers, timeTaken }: { quizId: number; answers: Record<number, string>; timeTaken: number }) =>
       api.post<{
@@ -65,8 +74,12 @@ export function useSubmitAttempt() {
         correct: number
         total: number
         xp_earned: number
-        results: Array<{ question_id: number; correct: boolean; chosen: string; answer: string; explanation: string }>
+        results: QuestionResult[]
       }>(`/quizzes/${quizId}/attempts`, { answers, time_taken: timeTaken }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["quizzes"] })
+      qc.invalidateQueries({ queryKey: ["stats"] })
+    },
   })
 }
 

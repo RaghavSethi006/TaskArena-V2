@@ -48,6 +48,13 @@ export default function StudyHubPage() {
     correct: number
     total: number
     xp_earned: number
+    results: Array<{
+      question_id: number
+      correct: boolean
+      chosen: string
+      answer: string
+      explanation: string
+    }>
   } | null>(null)
 
   const coursesQuery = useStudyHubCourses()
@@ -75,6 +82,7 @@ export default function StudyHubPage() {
       correct: result.correct,
       total: result.total,
       xp_earned: result.xp_earned,
+      results: result.results ?? [],
     })
     toast.success(`Quiz complete! +${result.xp_earned} XP`)
   }
@@ -227,13 +235,79 @@ export default function StudyHubPage() {
           ) : null}
 
           {quizResult ? (
-            <div className="rounded-[12px] border border-b1 bg-s1 p-8 text-center flex-1 flex flex-col items-center justify-center">
-              <p className="text-[56px] font-bold font-mono text-tx">{quizResult.score.toFixed(0)}%</p>
-              <p className="text-[16px] text-tx2 mt-2">
-                {quizResult.correct} / {quizResult.total} correct
-              </p>
-              <p className="text-[14px] text-blue-300 font-mono mt-2">+{quizResult.xp_earned} XP earned</p>
-              <div className="mt-8 flex gap-3">
+            <div className="flex-1 overflow-y-auto space-y-4">
+              <div className="rounded-[12px] border border-b1 bg-s1 p-6 text-center">
+                <p
+                  className={`text-[52px] font-bold font-mono ${
+                    quizResult.score >= 80 ? "text-emerald-400"
+                    : quizResult.score >= 60 ? "text-amber-400"
+                    : "text-rose-400"
+                  }`}
+                >
+                  {quizResult.score.toFixed(0)}%
+                </p>
+                <p className="text-[15px] text-tx2 mt-1">
+                  {quizResult.correct} / {quizResult.total} correct
+                </p>
+                <p className="text-[13px] text-blue-300 font-mono mt-1">
+                  +{quizResult.xp_earned} XP earned
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {(quizDetailQuery.data?.questions ?? []).map((q, idx) => {
+                  const r = quizResult.results.find((res) => res.question_id === q.id)
+                  if (!r) return null
+
+                  const correctLetter = r.answer.toUpperCase()
+                  const chosenLetter = r.chosen.toUpperCase()
+                  const correctText = q[`option_${r.answer}` as keyof typeof q] as string
+
+                  return (
+                    <div
+                      key={q.id}
+                      className={`rounded-[12px] border bg-s1 p-4 ${
+                        r.correct ? "border-emerald-500/25" : "border-rose-500/25"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2 mb-3">
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] flex-shrink-0 mt-0.5 ${
+                            r.correct
+                              ? "bg-emerald-500/15 text-emerald-400"
+                              : "bg-rose-500/15 text-rose-400"
+                          }`}
+                        >
+                          {r.correct ? "✓ Correct" : "✗ Wrong"}
+                        </span>
+                        <p className="text-[13px] text-tx leading-snug">
+                          Q{idx + 1}. {q.question}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {!r.correct ? (
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                            You chose: {chosenLetter}. {q[`option_${r.chosen}` as keyof typeof q] as string || "—"}
+                          </span>
+                        ) : null}
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                          Correct: {correctLetter}. {correctText}
+                        </span>
+                      </div>
+
+                      {r.explanation ? (
+                        <div className="rounded-[7px] bg-s2/60 border border-b1 p-2.5">
+                          <p className="text-[10px] text-tx3 font-mono uppercase tracking-wide mb-1">Explanation</p>
+                          <p className="text-[12px] text-tx2 leading-relaxed">{r.explanation}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="flex gap-3 pb-4">
                 <button
                   type="button"
                   onClick={() => {
