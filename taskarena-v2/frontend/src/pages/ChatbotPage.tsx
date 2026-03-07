@@ -1,4 +1,4 @@
-import { Paperclip, Plus, Send, Trash2 } from "lucide-react"
+import { PanelLeft, Paperclip, Plus, Send, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate, useParams } from "react-router-dom"
@@ -31,6 +31,7 @@ export default function ChatbotPage() {
   const [streamingContent, setStreamingContent] = useState("")
   const [provider, setProvider] = useState<Provider>("groq")
   const [model, setModel] = useState("llama-3.3-70b-versatile")
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [contextOpen, setContextOpen] = useState(false)
   const [contextMode, setContextMode] = useState<ContextMode>("none")
   const [courseId, setCourseId] = useState("")
@@ -196,8 +197,15 @@ export default function ChatbotPage() {
 
   return (
     <div className="animate-fadeUp h-full">
-      <div className="h-full rounded-[10px] border border-b1 bg-s1 overflow-hidden grid grid-cols-1 lg:grid-cols-[230px_1fr]">
-        <aside className="border-r border-b1 bg-s2/40 p-3 flex flex-col">
+      <div
+        className="h-full rounded-[10px] border border-b1 bg-s1 overflow-hidden grid transition-all duration-200"
+        style={{ gridTemplateColumns: sidebarOpen ? "230px 1fr" : "0px 1fr" }}
+      >
+        <aside
+          className={`border-r border-b1 bg-s2/40 flex flex-col overflow-hidden transition-all duration-200 ${
+            sidebarOpen ? "p-3" : "p-0 border-r-0"
+          }`}
+        >
           <button
             type="button"
             onClick={() => void createNewConversation()}
@@ -206,7 +214,7 @@ export default function ChatbotPage() {
             <Plus className="w-3.5 h-3.5" />
             New
           </button>
-          <div className="mt-3 space-y-1 overflow-y-auto">
+          <div className="mt-3 space-y-1 overflow-y-auto flex-1">
             {(conversationsQuery.data ?? []).map((conv) => (
               <button
                 key={conv.id}
@@ -241,6 +249,14 @@ export default function ChatbotPage() {
         <section className="flex flex-col min-h-0">
           <div className="h-[50px] border-b border-b1 px-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen((value) => !value)}
+                className="w-7 h-7 rounded-[6px] border border-b1 bg-s2 text-tx3 hover:bg-s3 flex items-center justify-center flex-shrink-0 transition-colors"
+                title={sidebarOpen ? "Hide conversations" : "Show conversations"}
+              >
+                <PanelLeft className="w-3.5 h-3.5" />
+              </button>
               <h2 className="text-[13px] font-semibold truncate">{activeConversation?.title ?? "AI Tutor"}</h2>
               <button
                 type="button"
