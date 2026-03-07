@@ -263,12 +263,13 @@ export default function NotesPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="mt-1 text-[10px] font-mono">
-                      {file.indexed ? (
-                        <span className="text-emerald-300">indexed ({file.chunk_count} chunks)</span>
-                      ) : (
-                        <span className="text-tx3">not indexed</span>
-                      )}
+                    <div className="mt-1 flex items-center gap-2 text-[10px] font-mono">
+                      <span className={file.indexed ? "text-emerald-300" : "text-tx3"}>
+                        {file.indexed ? "indexed" : "not indexed"}
+                      </span>
+                      <span className="text-[10px] text-tx3 font-mono">
+                        {file.indexed ? `${file.chunk_count} chunks` : "not indexed"}
+                      </span>
                     </div>
                   </div>
                 ))}

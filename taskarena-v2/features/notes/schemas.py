@@ -42,6 +42,7 @@ class FolderOut(BaseModel):
 
 class FileOut(BaseModel):
     id: int
+    folder_id: int
     name: str
     path: str
     original_path: Optional[str]
