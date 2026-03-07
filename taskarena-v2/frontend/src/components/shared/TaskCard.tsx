@@ -1,4 +1,4 @@
-import { MoreHorizontal, Play } from "lucide-react"
+import { CheckCircle2, Circle, MoreHorizontal, Play } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
@@ -39,12 +39,18 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, compact 
         <button
           type="button"
           onClick={() => onComplete(task.id)}
-          className={cn(
-            "mt-0.5 w-[18px] h-[18px] rounded-[4px] border-2 flex items-center justify-center",
-            completed ? "bg-emerald-500 border-emerald-500" : "border-b2 hover:border-emerald-400"
-          )}
+          title={task.status === "completed" ? "Mark as pending" : "Mark as complete"}
+          className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+            task.status === "completed"
+              ? "border-emerald-400 bg-emerald-400/20 text-emerald-400 hover:bg-rose-400/10 hover:border-rose-400 hover:text-rose-400"
+              : "border-b2 hover:border-emerald-400 hover:text-emerald-400 text-transparent"
+          }`}
         >
-          {completed ? <span className="text-[10px] text-white font-bold">✓</span> : null}
+          {task.status === "completed" ? (
+            <CheckCircle2 className="w-3 h-3" />
+          ) : (
+            <Circle className="w-3 h-3" />
+          )}
         </button>
 
         <div className="min-w-0 flex-1">

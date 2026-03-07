@@ -9,7 +9,7 @@ import TaskCard from "@/components/shared/TaskCard"
 import { api } from "@/api/client"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { useCreateTask, useTasks, useCompleteTask, useDeleteTask } from "@/hooks/useTasks"
+import { useCreateTask, useTasks, useCompleteTask, useDeleteTask, useUncompleteTask } from "@/hooks/useTasks"
 import type { Course, Task, TaskCreate } from "@/types"
 import { useToolsStore } from "@/stores/toolsStore"
 import { toast } from "sonner"
@@ -88,6 +88,7 @@ export default function TasksPage() {
   })
   const createTask = useCreateTask()
   const completeTask = useCompleteTask()
+  const uncompleteTask = useUncompleteTask()
   const deleteTask = useDeleteTask()
 
   const filteredTasks = useMemo(() => {
@@ -113,12 +114,17 @@ export default function TasksPage() {
     return groups
   }, [filteredTasks, sortBy])
 
-  const handleComplete = async (id: number) => {
+  const handleComplete = async (id: number, currentStatus: Task["status"]) => {
     try {
-      const result = await completeTask.mutateAsync(id)
-      toast.success(`Task complete! +${result.xp_earned} XP`)
+      if (currentStatus === "completed") {
+        await uncompleteTask.mutateAsync(id)
+        toast.success("Task marked as pending")
+      } else {
+        const result = await completeTask.mutateAsync(id)
+        toast.success(`Task complete! +${result.xp_earned} XP`)
+      }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to complete task"
+      const message = error instanceof Error ? error.message : "Failed to update task"
       toast.error(message)
     }
   }
@@ -285,7 +291,13 @@ export default function TasksPage() {
                 </div>
                 <div className="space-y-2 min-h-[220px]">
                   {columnPending.map((task) => (
-                    <TaskCard key={task.id} task={task} onComplete={handleComplete} onDelete={handleDelete} onFocus={handleFocus} />
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={(id) => void handleComplete(id, task.status)}
+                      onDelete={handleDelete}
+                      onFocus={handleFocus}
+                    />
                   ))}
                   {columnCompleted.length > 0 ? (
                     <div className="mt-2 border-t border-b1 pt-2">
@@ -294,7 +306,11 @@ export default function TasksPage() {
                       </p>
                       {columnCompleted.map((task) => (
                         <div key={task.id} className="opacity-40">
-                          <TaskCard task={task} onComplete={() => {}} onDelete={handleDelete} />
+                          <TaskCard
+                            task={task}
+                            onComplete={(id) => void handleComplete(id, task.status)}
+                            onDelete={handleDelete}
+                          />
                         </div>
                       ))}
                     </div>
@@ -349,7 +365,13 @@ export default function TasksPage() {
                 {!collapsedGroups[group] ? (
                   <div className="space-y-2">
                     {tasks.map((task) => (
-                      <TaskCard key={task.id} task={task} onComplete={handleComplete} onDelete={handleDelete} compact />
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onComplete={(id) => void handleComplete(id, task.status)}
+                        onDelete={handleDelete}
+                        compact
+                      />
                     ))}
                   </div>
                 ) : null}

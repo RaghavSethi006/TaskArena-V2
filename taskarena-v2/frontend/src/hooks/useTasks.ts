@@ -56,6 +56,32 @@ export function useCompleteTask() {
   })
 }
 
+export function useUncompleteTask() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.patch<Task>(`/tasks/${id}`, { status: "pending" }),
+    onMutate: async (id: number) => {
+      await qc.cancelQueries({ queryKey: ["tasks"] })
+      const snapshots = qc.getQueriesData<Task[]>({ queryKey: ["tasks"] })
+      qc.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
+        old?.map((task) =>
+          task.id === id
+            ? { ...task, status: "pending", completed_at: null }
+            : task
+        )
+      )
+      return { snapshots }
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] })
+      qc.invalidateQueries({ queryKey: ["stats"] })
+    },
+  })
+}
+
 export function useDeleteTask() {
   const qc = useQueryClient()
   return useMutation({
