@@ -78,6 +78,32 @@ export default function ChatbotPage() {
     [activeConvId, conversationsQuery.data]
   )
 
+  useEffect(() => {
+    if (!contextOpen || !activeConversation) return
+
+    if (activeConversation.context_file_id) {
+      setContextMode("file")
+      setFileId(String(activeConversation.context_file_id))
+      setCourseId(activeConversation.context_course_id ? String(activeConversation.context_course_id) : "")
+      setFolderId(activeConversation.context_folder_id ? String(activeConversation.context_folder_id) : "")
+    } else if (activeConversation.context_folder_id) {
+      setContextMode("folder")
+      setFolderId(String(activeConversation.context_folder_id))
+      setCourseId(activeConversation.context_course_id ? String(activeConversation.context_course_id) : "")
+      setFileId("")
+    } else if (activeConversation.context_course_id) {
+      setContextMode("course")
+      setCourseId(String(activeConversation.context_course_id))
+      setFolderId("")
+      setFileId("")
+    } else {
+      setContextMode("none")
+      setCourseId("")
+      setFolderId("")
+      setFileId("")
+    }
+  }, [contextOpen, activeConversation])
+
   const createNewConversation = async () => {
     try {
       const conv = await createConversation.mutateAsync()
@@ -105,12 +131,26 @@ export default function ChatbotPage() {
 
   const applyContext = async () => {
     if (!activeConvId) return
+
+    if (contextMode !== "none" && !courseId) {
+      toast.error("Please select a course")
+      return
+    }
+    if ((contextMode === "folder" || contextMode === "file") && !folderId) {
+      toast.error("Please select a folder")
+      return
+    }
+    if (contextMode === "file" && !fileId) {
+      toast.error("Please select a file")
+      return
+    }
+
     try {
       await updateContext.mutateAsync({
         id: activeConvId,
-        context_course_id: contextMode === "course" || contextMode === "folder" || contextMode === "file" ? Number(courseId || 0) || null : null,
-        context_folder_id: contextMode === "folder" || contextMode === "file" ? Number(folderId || 0) || null : null,
-        context_file_id: contextMode === "file" ? Number(fileId || 0) || null : null,
+        context_course_id: contextMode !== "none" ? Number(courseId) : null,
+        context_folder_id: contextMode === "folder" || contextMode === "file" ? Number(folderId) : null,
+        context_file_id: contextMode === "file" ? Number(fileId) : null,
       })
       setContextOpen(false)
       toast.success("Context updated")
