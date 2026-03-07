@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog"
-import { FileText, Folder as FolderIcon, Search, Upload } from "lucide-react"
+import { BookOpen, FileText, Folder as FolderIcon, Search, Upload } from "lucide-react"
 import { useMemo, useState } from "react"
 import EmptyState from "@/components/shared/EmptyState"
 import LoadingSkeleton from "@/components/shared/LoadingSkeleton"
@@ -94,18 +94,43 @@ export default function NotesPage() {
         {(coursesQuery.data ?? []).length === 0 ? (
           <EmptyState title="No courses found" description="Seed or create courses to start." />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {(coursesQuery.data ?? []).map((course) => (
               <button
                 key={course.id}
                 type="button"
                 onClick={() => setSelectedCourse(course)}
-                className="rounded-[10px] border border-b1 bg-s1 overflow-hidden text-left hover:border-b2 transition-colors duration-[120ms]"
+                className="group rounded-[12px] border border-b1 bg-s1 overflow-hidden text-left hover:border-b2 hover:shadow-lg transition-all duration-[120ms]"
               >
-                <div className="h-1.5" style={{ backgroundColor: course.color }} />
+                <div
+                  className="h-28 flex items-center justify-center"
+                  style={{ backgroundColor: `${course.color}14` }}
+                >
+                  <div className="relative">
+                    <div
+                      className="absolute -top-3 left-0 w-12 h-3 rounded-t-[5px]"
+                      style={{ backgroundColor: course.color }}
+                    />
+                    <div
+                      className="w-24 h-16 rounded-[5px] rounded-tl-none flex items-center justify-center"
+                      style={{ backgroundColor: course.color }}
+                    >
+                      <BookOpen className="w-7 h-7 text-white/80" />
+                    </div>
+                  </div>
+                </div>
                 <div className="p-4">
-                  <p className="text-[14px] font-semibold">{course.name}</p>
-                  <p className="text-[11px] text-tx3 font-mono mt-1">{course.code}</p>
+                  <p className="text-[14px] font-semibold text-tx">{course.name}</p>
+                  <p className="text-[11px] text-tx3 font-mono mt-0.5">{course.code}</p>
+                  {/* TODO: replace "-" with real counts once GET /api/notes/courses/summary is added */}
+                  <div className="mt-3 flex items-center gap-3 text-[11px] text-tx3 font-mono">
+                    <span className="flex items-center gap-1">
+                      <FolderIcon className="w-3 h-3" /> - folders
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> - files
+                    </span>
+                  </div>
                 </div>
               </button>
             ))}
