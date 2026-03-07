@@ -25,10 +25,10 @@ interface TaskFilters {
 interface NewTaskForm {
   title: string
   type: "assignment" | "study" | "productivity"
-  subject: string
+  subjectMode: string
+  customSubject: string
   deadline: string
   points: number
-  course_id: string
 }
 
 const KANBAN_TYPES: Array<{ key: Task["type"]; label: string; color: string }> = [
@@ -74,10 +74,10 @@ export default function TasksPage() {
   const [newTask, setNewTask] = useState<NewTaskForm>({
     title: "",
     type: "assignment",
-    subject: "",
+    subjectMode: "",
+    customSubject: "",
     deadline: "",
     points: 5,
-    course_id: "",
   })
 
   const effectiveStatus = view === "kanban" ? "" : filters.status
@@ -164,13 +164,29 @@ export default function TasksPage() {
       toast.error("Title is required")
       return
     }
+
+    let subject: string | undefined
+    let courseIdNum: number | undefined
+
+    if (newTask.subjectMode === "" || newTask.subjectMode === "none") {
+      // No subject linked.
+    } else if (newTask.subjectMode === "other") {
+      subject = newTask.customSubject.trim() || undefined
+    } else {
+      const course = (coursesQuery.data ?? []).find((item) => String(item.id) === newTask.subjectMode)
+      if (course) {
+        subject = course.name
+        courseIdNum = course.id
+      }
+    }
+
     const payload: TaskCreate = {
       title: newTask.title.trim(),
       type: newTask.type,
-      subject: newTask.subject || undefined,
+      subject,
       deadline: newTask.deadline || undefined,
       points: newTask.points,
-      course_id: newTask.course_id ? Number(newTask.course_id) : undefined,
+      course_id: courseIdNum,
     }
     const task = await createTask.mutateAsync(payload)
     toast.success("Task created")
@@ -198,7 +214,7 @@ export default function TasksPage() {
     }
 
     setAddModalOpen(false)
-    setNewTask({ title: "", type: "assignment", subject: "", deadline: "", points: 5, course_id: "" })
+    setNewTask({ title: "", type: "assignment", subjectMode: "", customSubject: "", deadline: "", points: 5 })
   }
 
   return (
@@ -446,12 +462,30 @@ export default function TasksPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[11px] text-tx3">Subject</label>
-                <input
-                  value={newTask.subject}
-                  onChange={(e) => setNewTask((prev) => ({ ...prev, subject: e.target.value }))}
-                  className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
-                />
+                <label className="text-[11px] text-tx3">Subject / Course</label>
+                <select
+                  value={newTask.subjectMode}
+                  onChange={(e) =>
+                    setNewTask((prev) => ({ ...prev, subjectMode: e.target.value, customSubject: "" }))
+                  }
+                  className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+                >
+                  <option value="">None</option>
+                  {(coursesQuery.data ?? []).map((course) => (
+                    <option key={course.id} value={String(course.id)}>
+                      {course.name} {course.code ? `(${course.code})` : ""}
+                    </option>
+                  ))}
+                  <option value="other">Other (type manually)</option>
+                </select>
+                {newTask.subjectMode === "other" ? (
+                  <input
+                    value={newTask.customSubject}
+                    onChange={(e) => setNewTask((prev) => ({ ...prev, customSubject: e.target.value }))}
+                    placeholder="Enter subject name"
+                    className="mt-2 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+                  />
+                ) : null}
               </div>
               <div>
                 <label className="text-[11px] text-tx3">Deadline</label>
@@ -462,21 +496,6 @@ export default function TasksPage() {
                   className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
                 />
               </div>
-            </div>
-            <div>
-              <label className="text-[11px] text-tx3">Link to course</label>
-              <select
-                value={newTask.course_id}
-                onChange={(e) => setNewTask((prev) => ({ ...prev, course_id: e.target.value }))}
-                className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
-              >
-                <option value="">None</option>
-                {(coursesQuery.data ?? []).map((course) => (
-                  <option key={course.id} value={String(course.id)}>
-                    {course.name}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
           <DialogFooter>
