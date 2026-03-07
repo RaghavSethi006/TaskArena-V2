@@ -15,7 +15,22 @@ interface QuizGenerateRequest {
 export function useStudyHubCourses() {
   return useQuery({
     queryKey: ["study-hub", "courses"],
-    queryFn: () => api.get<Course[]>("/notes/courses"),
+    queryFn: async () => {
+      const courses = await api.get<Course[]>("/notes/courses")
+      const counts = await Promise.all(
+        courses.map((course) =>
+          api
+            .get<Quiz[]>(`/quizzes?course_id=${course.id}`)
+            .then((quizzes) => ({ id: course.id, quiz_count: quizzes.length }))
+            .catch(() => ({ id: course.id, quiz_count: 0 }))
+        )
+      )
+
+      return courses.map((course) => ({
+        ...course,
+        quiz_count: counts.find((item) => item.id === course.id)?.quiz_count ?? 0,
+      }))
+    },
   })
 }
 

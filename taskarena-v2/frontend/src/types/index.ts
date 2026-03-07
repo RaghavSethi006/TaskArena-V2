@@ -41,6 +41,7 @@ export interface Course {
   color: string
   user_id: number
   created_at: string
+  quiz_count?: number
 }
 
 export interface Folder {

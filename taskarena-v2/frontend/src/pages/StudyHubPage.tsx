@@ -1,6 +1,6 @@
-import { BookOpen, FlaskConical, Plus, ScrollText, Trash2 } from "lucide-react"
+import { Brain, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
-import { BASE_API } from "@/api/client"
+import { getBaseApiUrl } from "@/api/client"
 import EmptyState from "@/components/shared/EmptyState"
 import LoadingSkeleton from "@/components/shared/LoadingSkeleton"
 import PageHeader from "@/components/shared/PageHeader"
@@ -86,7 +86,8 @@ export default function StudyHubPage() {
     setGenSteps([])
 
     try {
-      const response = await fetch(`${BASE_API}/quizzes/generate`, {
+      const baseApiUrl = await getBaseApiUrl()
+      const response = await fetch(`${baseApiUrl}/quizzes/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -136,23 +137,43 @@ export default function StudyHubPage() {
     return (
       <div className="animate-fadeUp">
         <PageHeader title="Study Hub" subtitle="All generated study materials in one place." />
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {(coursesQuery.data ?? []).map((course) => (
             <button
               key={course.id}
               type="button"
               onClick={() => setSelectedCourse(course)}
-              className="rounded-[10px] border border-b1 bg-s1 overflow-hidden text-left hover:border-b2 transition-colors duration-[120ms]"
+              className="group rounded-[12px] border border-b1 bg-s1 text-left hover:border-b2 transition-all duration-[120ms] overflow-hidden"
             >
-              <div className="h-1.5" style={{ backgroundColor: course.color }} />
+              <div className="h-1" style={{ backgroundColor: course.color }} />
               <div className="p-4">
-                <p className="text-[14px] font-semibold">{course.name}</p>
-                <p className="text-[11px] text-tx3 font-mono mt-1">{course.code}</p>
-                <div className="mt-3 text-[11px] text-tx2 space-y-1">
-                  <p className="inline-flex items-center gap-1"><ScrollText className="w-3.5 h-3.5" /> {quizzesQuery.data?.length ?? 0} quizzes</p>
-                  <p className="inline-flex items-center gap-1 ml-3"><BookOpen className="w-3.5 h-3.5" /> 0 notes</p>
-                  <p className="inline-flex items-center gap-1 ml-3"><FlaskConical className="w-3.5 h-3.5" /> 0 sheets</p>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-tx">{course.name}</p>
+                    <p className="text-[11px] text-tx3 font-mono">{course.code}</p>
+                  </div>
+                  <div
+                    className="w-8 h-8 rounded-[7px] flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${course.color}20` }}
+                  >
+                    <Brain className="w-4 h-4" style={{ color: course.color }} />
+                  </div>
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-[7px] bg-s2/60 border border-b1 p-2 text-center">
+                    <p className="text-[15px] font-bold text-tx font-mono">{course.quiz_count ?? 0}</p>
+                    <p className="text-[9px] text-tx3 uppercase tracking-wide mt-0.5">Quizzes</p>
+                  </div>
+                  <div className="rounded-[7px] bg-s2/60 border border-b1 p-2 text-center">
+                    <p className="text-[15px] font-bold text-tx font-mono">0</p>
+                    <p className="text-[9px] text-tx3 uppercase tracking-wide mt-0.5">Notes</p>
+                  </div>
+                  <div className="rounded-[7px] bg-s2/60 border border-b1 p-2 text-center">
+                    <p className="text-[15px] font-bold text-tx font-mono">0</p>
+                    <p className="text-[9px] text-tx3 uppercase tracking-wide mt-0.5">Sheets</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-[10px] text-tx3 font-mono">Tap to browse materials -&gt;</p>
               </div>
             </button>
           ))}
