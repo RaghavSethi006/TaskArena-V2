@@ -130,12 +130,31 @@ class NotesService:
     # -- Files --
     def get_files(self, folder_id: int) -> list[File]:
         self.get_folder(folder_id)
-        return (
+        files = (
             self.db.query(File)
             .filter(File.folder_id == folder_id)
             .order_by(File.created_at.asc(), File.id.asc())
             .all()
         )
+        if not files:
+            return files
+
+        file_ids = [file_obj.id for file_obj in files]
+        chunk_rows = (
+            self.db.query(
+                FileChunk.file_id.label("file_id"),
+                func.count(FileChunk.id).label("cnt"),
+            )
+            .filter(FileChunk.file_id.in_(file_ids))
+            .group_by(FileChunk.file_id)
+            .all()
+        )
+        chunk_counts = {row.file_id: int(row.cnt) for row in chunk_rows}
+
+        for file_obj in files:
+            file_obj.chunk_count = chunk_counts.get(file_obj.id, 0)
+
+        return files
 
     def add_file(self, folder_id: int, name: str, original_path: str) -> File:
         """
@@ -235,7 +254,10 @@ class NotesService:
         Returns chunk count.
         """
         self.get_file(file_id)
-        return self.indexer.index_file(file_id, self.db)
+        count = self.indexer.index_file(file_id, self.db)
+        file_obj = self.get_file(file_id)
+        file_obj.chunk_count = count
+        return count
 
     def get_chunk_count(self, file_id: int) -> int:
         """Count FileChunk rows for this file."""
