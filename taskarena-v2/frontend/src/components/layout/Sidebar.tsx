@@ -96,7 +96,7 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative h-screen bg-s1 border-r border-b1 overflow-y-auto overflow-x-hidden",
+        "relative h-screen bg-s1 border-r border-b1 overflow-y-auto",
         "transition-[width,min-width] duration-200 ease-in-out",
         collapsed ? "w-[56px] min-w-[56px]" : "w-[220px] min-w-[220px]"
       )}
@@ -149,8 +149,25 @@ export default function Sidebar() {
           </div>
         </TooltipProvider>
 
-        <div className="mt-auto p-3 border-t border-b1">
-          <div className={cn("flex items-center gap-2.5 px-2 py-2 rounded-[7px]", collapsed && "justify-center")}>
+        <div className="mt-auto border-t border-b1">
+          <button
+            onClick={toggleSidebar}
+            type="button"
+            className={cn(
+              "w-full flex items-center gap-2.5 py-2.5 text-tx3 hover:text-tx hover:bg-s2 transition-colors duration-[120ms]",
+              collapsed ? "justify-center px-0" : "px-4"
+            )}
+          >
+            <ChevronRight
+              className={cn(
+                "w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200",
+                !collapsed && "rotate-180"
+              )}
+            />
+            {!collapsed ? <span className="text-[11px] font-medium">Collapse</span> : null}
+          </button>
+
+          <div className={cn("flex items-center gap-2.5 px-3 py-2.5", collapsed && "justify-center")}>
             <div className="w-7 h-7 rounded-[7px] bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0">
               <span className="text-[10px] font-bold text-white font-mono">RS</span>
             </div>
@@ -163,16 +180,6 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-
-      <button
-        onClick={toggleSidebar}
-        className="absolute bottom-[70px] -right-3 w-6 h-6 rounded-full bg-s2 border border-b1 flex items-center justify-center hover:bg-s3 transition-colors"
-        type="button"
-      >
-        <ChevronRight
-          className={cn("w-3 h-3 text-tx3 transition-transform duration-200", !collapsed && "rotate-180")}
-        />
-      </button>
     </aside>
   )
 }
