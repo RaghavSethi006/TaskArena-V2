@@ -358,7 +358,9 @@ export default function ChatbotPage() {
             )}
           </div>
 
-          {activeConversation?.context_course_id ? (
+          {(activeConversation?.context_course_id ||
+            activeConversation?.context_folder_id ||
+            activeConversation?.context_file_id) ? (
             <div className="px-3 py-1.5 border-b border-b1 bg-s2/30 text-[10px] text-blue-300 font-mono">
               RAG active - searching your notes for context
             </div>
