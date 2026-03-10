@@ -55,22 +55,14 @@ class RAGService:
             query[:60], course_id, folder_id, file_id,
         )
 
-        try:
-            results = self.indexer.search(
-                query=query,
-                db=self.db,
-                course_id=course_id,
-                folder_id=folder_id,
-                file_id=file_id,
-                top_k=top_k,
-            )
-        except Exception as exc:
-            LOGGER.error(
-                "RAG search failed (course_id=%s folder_id=%s file_id=%s): %s",
-                course_id, folder_id, file_id, exc,
-                exc_info=True,
-            )
-            return ""
+        results = self.indexer.search(
+            query=query,
+            db=self.db,
+            course_id=course_id,
+            folder_id=folder_id,
+            file_id=file_id,
+            top_k=top_k,
+        )
         if not results:
             return ""
 
