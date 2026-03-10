@@ -10,8 +10,22 @@ logger = logging.getLogger("taskarena")
 def setup_middleware(app: FastAPI) -> None:
     """Register all middleware on the app. Called once in main.py."""
 
-    # CORS removed - frontend served by Tauri, same origin as backend.
-    # If you need to test in a plain browser (not Tauri), add CORS back temporarily.
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:1420",
+            "tauri://localhost",
+            "http://tauri.localhost",      # Windows
+            "https://tauri.localhost",     # Windows alternative
+            "http://localhost",            # macOS/Linux generic
+            "*"                            # Fallback for dev desktop modes
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # Request timing + logging
     @app.middleware("http")
