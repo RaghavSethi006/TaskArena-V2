@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from typing import AsyncGenerator
 
@@ -14,6 +15,8 @@ import shared.user_model  # noqa: F401
 from features.chatbot.ai_service import get_ai
 from features.chatbot.models import ChatConversation, ChatMessage
 from features.chatbot.rag_service import RAGService
+
+LOGGER = logging.getLogger(__name__)
 
 
 CHATBOT_SYSTEM_PROMPT = """You are TaskArena's AI tutor, helping a student understand their course material.
@@ -184,6 +187,11 @@ class ChatService:
             course_id=conversation.context_course_id,
             folder_id=conversation.context_folder_id,
             file_id=conversation.context_file_id,
+        )
+
+        LOGGER.debug(
+            "stream_response: conv_id=%s context_len=%d sources=%s",
+            conv_id, len(context), sources,
         )
 
         history = self.build_message_history(conv_id)
