@@ -80,21 +80,40 @@ export async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const baseUrl = await getBaseApiUrl()
-  const res = await fetch(`${baseUrl}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
-    ...options,
-  })
+  const url = `${baseUrl}${path}`
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Unknown error" }))
-    throw new Error(error.detail ?? `HTTP ${res.status}`)
+  // Add a small retry for startup window (backend might still be initializing)
+  const maxRetries = 3
+  const retryDelay = 1000
+
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json", ...options.headers },
+        ...options,
+      })
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: "Unknown error" }))
+        throw new Error(error.detail ?? `HTTP ${res.status}`)
+      }
+
+      if (res.status === 204) {
+        return undefined as T
+      }
+
+      return res.json()
+    } catch (error) {
+      // If it's the last attempt OR it's a "real" error (not a connection error), throw it
+      if (i === maxRetries || (error instanceof Error && !error.message.includes("Failed to fetch") && !error.message.includes("NetworkError"))) {
+        throw error
+      }
+      // Otherwise, wait and try again
+      console.warn(`[API] Retrying ${path} (attempt ${i + 1}/${maxRetries})...`)
+      await sleep(retryDelay)
+    }
   }
-
-  if (res.status === 204) {
-    return undefined as T
-  }
-
-  return res.json()
+  throw new Error("Failed to fetch")
 }
 
 export const api = {

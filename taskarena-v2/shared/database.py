@@ -1,4 +1,4 @@
-﻿from sqlalchemy import create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from shared.config import settings
@@ -7,7 +7,7 @@ from shared.config import settings
 engine = create_engine(
     settings.db_url,
     connect_args={"check_same_thread": False},
-    echo=settings.debug,
+    echo=False,
 )
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
