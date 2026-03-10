@@ -50,6 +50,11 @@ class RAGService:
         if course_id is None and folder_id is None and file_id is None:
             return ""
 
+        LOGGER.debug(
+            "RAG get_context called: query=%r course_id=%s folder_id=%s file_id=%s",
+            query[:60], course_id, folder_id, file_id,
+        )
+
         try:
             results = self.indexer.search(
                 query=query,
@@ -60,7 +65,11 @@ class RAGService:
                 top_k=top_k,
             )
         except Exception as exc:
-            LOGGER.warning("RAG search failed; continuing without context: %s", exc)
+            LOGGER.error(
+                "RAG search failed (course_id=%s folder_id=%s file_id=%s): %s",
+                course_id, folder_id, file_id, exc,
+                exc_info=True,
+            )
             return ""
         if not results:
             return ""
@@ -91,6 +100,11 @@ class RAGService:
         if course_id is None and folder_id is None and file_id is None:
             return []
 
+        LOGGER.debug(
+            "RAG get_sources called: query=%r course_id=%s folder_id=%s file_id=%s",
+            query[:60], course_id, folder_id, file_id,
+        )
+
         try:
             results = self.indexer.search(
                 query=query,
@@ -101,7 +115,11 @@ class RAGService:
                 top_k=top_k,
             )
         except Exception as exc:
-            LOGGER.warning("RAG source lookup failed; returning no sources: %s", exc)
+            LOGGER.error(
+                "RAG source lookup failed (course_id=%s folder_id=%s file_id=%s): %s",
+                course_id, folder_id, file_id, exc,
+                exc_info=True,
+            )
             return []
         if not results:
             return []
