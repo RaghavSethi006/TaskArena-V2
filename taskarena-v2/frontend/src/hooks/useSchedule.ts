@@ -61,3 +61,14 @@ export function useAcceptSuggestion() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
   })
 }
+
+export function useDeleteEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (eventId: number) => api.delete<void>(`/schedule/${eventId}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["schedule"] })
+      await qc.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}

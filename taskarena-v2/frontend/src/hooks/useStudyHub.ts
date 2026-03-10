@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
-import type { Course, Quiz, QuizQuestion } from "@/types"
+import type { Course, Quiz, QuizAttempt, QuizQuestion } from "@/types"
 
 interface QuizGenerateRequest {
   title: string
@@ -46,6 +46,7 @@ export function useQuizzes(courseId: number | null) {
   return useQuery({
     queryKey: ["study-hub", "quizzes", courseId],
     queryFn: () => api.get<Quiz[]>(`/quizzes${courseId ? `?course_id=${courseId}` : ""}`),
+    enabled: courseId !== null,
   })
 }
 
@@ -53,7 +54,10 @@ export function useGenerateQuiz() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (payload: QuizGenerateRequest) => api.post("/quizzes/generate", payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["study-hub", "quizzes"] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["study-hub", "quizzes"] })
+      await qc.invalidateQueries({ queryKey: ["study-hub", "courses"] })
+    },
   })
 }
 
@@ -61,7 +65,10 @@ export function useDeleteQuiz() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (quizId: number) => api.delete<void>(`/quizzes/${quizId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["study-hub", "quizzes"] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["study-hub", "quizzes"] })
+      await qc.invalidateQueries({ queryKey: ["study-hub", "courses"] })
+    },
   })
 }
 
@@ -76,9 +83,11 @@ export function useSubmitAttempt() {
         xp_earned: number
         results: QuestionResult[]
       }>(`/quizzes/${quizId}/attempts`, { answers, time_taken: timeTaken }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["quizzes"] })
-      qc.invalidateQueries({ queryKey: ["stats"] })
+    onSuccess: async (_result, variables) => {
+      await qc.invalidateQueries({ queryKey: ["study-hub", "quizzes"] })
+      await qc.invalidateQueries({ queryKey: ["study-hub", "quiz", variables.quizId] })
+      await qc.invalidateQueries({ queryKey: ["study-hub", "quiz-attempts", variables.quizId] })
+      await qc.invalidateQueries({ queryKey: ["stats"] })
     },
   })
 }
@@ -87,6 +96,14 @@ export function useQuizDetail(quizId: number | null) {
   return useQuery({
     queryKey: ["study-hub", "quiz", quizId],
     queryFn: () => api.get<{ quiz: Quiz; questions: QuizQuestion[] }>(`/quizzes/${quizId}`),
+    enabled: quizId !== null,
+  })
+}
+
+export function useQuizAttempts(quizId: number | null) {
+  return useQuery({
+    queryKey: ["study-hub", "quiz-attempts", quizId],
+    queryFn: () => api.get<QuizAttempt[]>(`/quizzes/${quizId}/attempts`),
     enabled: quizId !== null,
   })
 }

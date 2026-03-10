@@ -1,7 +1,8 @@
+import json
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class QuizCreate(BaseModel):
@@ -41,6 +42,34 @@ class QuestionOut(BaseModel):
 class AttemptCreate(BaseModel):
     answers: dict[int, str]
     time_taken: int
+
+
+class AttemptOut(BaseModel):
+    id: int
+    quiz_id: int
+    user_id: int
+    score: Optional[float]
+    answers: dict[str, str] = Field(default_factory=dict)
+    time_taken: Optional[int]
+    taken_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("answers", mode="before")
+    @classmethod
+    def _deserialize_answers(cls, value: Any) -> dict[str, str]:
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return {str(key): str(val) for key, val in value.items()}
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                return {}
+            if isinstance(parsed, dict):
+                return {str(key): str(val) for key, val in parsed.items()}
+        return {}
 
 
 class QuestionResult(BaseModel):

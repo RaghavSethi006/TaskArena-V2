@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useFiles, useFolders } from "@/hooks/useNotes"
 import {
   useDeleteQuiz,
+  useQuizAttempts,
   useQuizDetail,
   useQuizzes,
   useStudyHubCourses,
@@ -28,6 +29,10 @@ const TAB_OPTIONS: Array<{ key: MaterialTab; label: string }> = [
   { key: "exams", label: "Practice Exams" },
 ]
 
+function formatAttemptTime(timestamp: string) {
+  return new Date(timestamp).toLocaleString()
+}
+
 export default function StudyHubPage() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [activeTab, setActiveTab] = useState<MaterialTab>("quizzes")
@@ -40,6 +45,7 @@ export default function StudyHubPage() {
   const [nQuestions, setNQuestions] = useState(10)
   const [genSteps, setGenSteps] = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
+  const [historyQuizId, setHistoryQuizId] = useState<number | null>(null)
   const [takingQuizId, setTakingQuizId] = useState<number | null>(null)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, string>>({})
@@ -61,6 +67,8 @@ export default function StudyHubPage() {
   const quizzesQuery = useQuizzes(selectedCourse?.id ?? null)
   const deleteQuiz = useDeleteQuiz()
   const quizDetailQuery = useQuizDetail(takingQuizId)
+  const quizAttemptsQuery = useQuizAttempts(takingQuizId)
+  const historyAttemptsQuery = useQuizAttempts(historyQuizId)
   const submitAttempt = useSubmitAttempt()
   const foldersQuery = useFolders(selectedCourse?.id ?? null)
   const filesQuery = useFiles(
@@ -77,6 +85,8 @@ export default function StudyHubPage() {
   const submitQuiz = async () => {
     if (!takingQuizId) return
     const result = await submitAttempt.mutateAsync({ quizId: takingQuizId, answers, timeTaken: 0 })
+    await quizAttemptsQuery.refetch()
+    await quizzesQuery.refetch()
     setQuizResult({
       score: result.score,
       correct: result.correct,
@@ -252,6 +262,42 @@ export default function StudyHubPage() {
                 <p className="text-[13px] text-blue-300 font-mono mt-1">
                   +{quizResult.xp_earned} XP earned
                 </p>
+              </div>
+
+              <div className="rounded-[12px] border border-b1 bg-s1 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[13px] font-semibold text-tx">Attempt History</p>
+                    <p className="text-[11px] text-tx3">Newest attempts are shown first.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryQuizId(takingQuizId)}
+                    className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3"
+                  >
+                    Open Full History
+                  </button>
+                </div>
+                {(quizAttemptsQuery.data ?? []).length === 0 ? (
+                  <p className="mt-3 text-[12px] text-tx3">No attempts saved yet.</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {(quizAttemptsQuery.data ?? []).slice(0, 3).map((attempt, idx) => (
+                      <div key={attempt.id} className="rounded-[8px] border border-b1 bg-s2/50 px-3 py-2 text-[12px]">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-tx">Attempt {idx + 1}</span>
+                          <span className="font-mono text-blue-300">
+                            {attempt.score !== null ? `${attempt.score.toFixed(0)}%` : "-"}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3 text-[10px] font-mono text-tx3">
+                          <span>{formatAttemptTime(attempt.taken_at)}</span>
+                          <span>{attempt.time_taken ?? 0}s</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -502,14 +548,25 @@ export default function StudyHubPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => startQuiz(quiz.id)}
-                    className="h-8 w-full rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <ScrollText className="w-3.5 h-3.5" />
-                    {quiz.attempt_count > 0 ? "Retake Quiz" : "Start Quiz"}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startQuiz(quiz.id)}
+                      className="h-8 flex-1 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <ScrollText className="w-3.5 h-3.5" />
+                      {quiz.attempt_count > 0 ? "Retake Quiz" : "Start Quiz"}
+                    </button>
+                    {quiz.attempt_count > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setHistoryQuizId(quiz.id)}
+                        className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3"
+                      >
+                        History
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             )
@@ -628,6 +685,45 @@ export default function StudyHubPage() {
               className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
             >
               {generating ? "Generating..." : "Generate"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyQuizId !== null} onOpenChange={(open) => !open && setHistoryQuizId(null)}>
+        <DialogContent className="bg-s1 border-b1 rounded-[12px]">
+          <DialogHeader>
+            <DialogTitle>Quiz Attempt History</DialogTitle>
+          </DialogHeader>
+          {(historyAttemptsQuery.data ?? []).length === 0 ? (
+            <EmptyState title="No attempts yet" description="Complete this quiz once to populate history." />
+          ) : (
+            <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+              {(historyAttemptsQuery.data ?? []).map((attempt, idx) => (
+                <div key={attempt.id} className="rounded-[8px] border border-b1 bg-s2/50 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[12px] text-tx">Attempt {idx + 1}</p>
+                      <p className="text-[10px] font-mono text-tx3">{formatAttemptTime(attempt.taken_at)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[16px] font-bold font-mono text-blue-300">
+                        {attempt.score !== null ? `${attempt.score.toFixed(0)}%` : "-"}
+                      </p>
+                      <p className="text-[10px] font-mono text-tx3">{attempt.time_taken ?? 0}s</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setHistoryQuizId(null)}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3"
+            >
+              Close
             </button>
           </DialogFooter>
         </DialogContent>

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user_id, get_db
-from features.quiz.schemas import AttemptCreate, QuestionOut, QuizOut
+from features.quiz.schemas import AttemptCreate, AttemptOut, QuestionOut, QuizOut
 from features.quiz.service import QuizService
 
 router = APIRouter(prefix="/quizzes", tags=["quiz"])
@@ -23,8 +23,12 @@ class GenerateRequest(BaseModel):
 
 
 @router.get("", response_model=list[QuizOut])
-def get_quizzes(course_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
-    return QuizService(db).get_quizzes(course_id=course_id)
+def get_quizzes(
+    course_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    return QuizService(db).get_quizzes(course_id=course_id, user_id=user_id)
 
 
 @router.post("/generate")
@@ -104,7 +108,7 @@ def delete_quiz(quiz_id: int, db: Session = Depends(get_db)) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{quiz_id}/attempts")
+@router.get("/{quiz_id}/attempts", response_model=list[AttemptOut])
 def get_attempts(
     quiz_id: int,
     db: Session = Depends(get_db),

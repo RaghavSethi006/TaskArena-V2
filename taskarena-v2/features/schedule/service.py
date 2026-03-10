@@ -13,6 +13,10 @@ import shared.user_model  # noqa: F401
 from features.schedule.ai_suggestions import ScheduleAI
 from features.schedule.models import ScheduleEvent
 from features.schedule.schemas import EventCreate, EventUpdate
+from features.tasks.models import Task
+
+
+AUTO_SYNC_NOTE_PREFIX = "Auto-synced from task #"
 
 
 class ScheduleService:
@@ -81,7 +85,12 @@ class ScheduleService:
 
     def delete_event(self, event_id: int) -> None:
         event = self.get_event(event_id)
+        linked_task_id = self._get_linked_task_id(event.notes)
         self.db.delete(event)
+        if linked_task_id is not None:
+            task = self.db.get(Task, linked_task_id)
+            if task is not None and task.user_id == event.user_id:
+                self.db.delete(task)
         self.db.commit()
 
     def get_week_events(self, user_id: int) -> list[ScheduleEvent]:
@@ -162,3 +171,14 @@ class ScheduleService:
         self.db.commit()
         self.db.refresh(event)
         return event
+
+    def _get_linked_task_id(self, notes: str | None) -> int | None:
+        if not notes or not notes.startswith(AUTO_SYNC_NOTE_PREFIX):
+            return None
+        suffix = notes[len(AUTO_SYNC_NOTE_PREFIX) :].strip()
+        if not suffix:
+            return None
+        task_id = suffix.split()[0]
+        if not task_id.isdigit():
+            return None
+        return int(task_id)

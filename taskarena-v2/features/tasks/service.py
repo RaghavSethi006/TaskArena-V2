@@ -9,9 +9,12 @@ import features.chatbot.models  # noqa: F401
 import features.notes.models  # noqa: F401
 import features.quiz.models  # noqa: F401
 import features.schedule.models  # noqa: F401
+from features.schedule.models import ScheduleEvent
 from features.tasks.models import Task, XPLog
 from features.tasks.schemas import TaskCreate, TaskUpdate
 from shared.user_model import User
+
+AUTO_SYNC_NOTE_PREFIX = "Auto-synced from task #"
 
 
 class TaskService:
@@ -112,6 +115,10 @@ class TaskService:
     def delete_task(self, task_id: int) -> None:
         """Delete task. Raise ValueError if not found."""
         task = self.get_task(task_id)
+        self.db.query(ScheduleEvent).filter(
+            ScheduleEvent.user_id == task.user_id,
+            ScheduleEvent.notes.like(f"{AUTO_SYNC_NOTE_PREFIX}{task.id}%"),
+        ).delete(synchronize_session=False)
         self.db.delete(task)
         self.db.commit()
 

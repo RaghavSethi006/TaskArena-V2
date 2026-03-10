@@ -86,6 +86,9 @@ export function useDeleteTask() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => api.delete<void>(`/tasks/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] })
+      await qc.invalidateQueries({ queryKey: ["schedule"] })
+    },
   })
 }

@@ -8,13 +8,13 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns"
-import { ChevronLeft, ChevronRight, Plus, Sparkles } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import EmptyState from "@/components/shared/EmptyState"
 import { api } from "@/api/client"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { useAcceptSuggestion, useCreateEvent, useMonthEvents, useSuggestions } from "@/hooks/useSchedule"
+import { useAcceptSuggestion, useCreateEvent, useDeleteEvent, useMonthEvents, useSuggestions } from "@/hooks/useSchedule"
 import { cn } from "@/lib/utils"
 import type { Course, ScheduleEvent } from "@/types"
 import { toast } from "sonner"
@@ -61,6 +61,7 @@ export default function SchedulePage() {
     queryFn: () => api.get<Course[]>("/notes/courses"),
   })
   const createEvent = useCreateEvent()
+  const deleteEvent = useDeleteEvent()
   const suggestionsQuery = useSuggestions(provider)
   const acceptSuggestion = useAcceptSuggestion()
 
@@ -117,6 +118,17 @@ export default function SchedulePage() {
       setAddModalOpen(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to add event"
+      toast.error(message)
+    }
+  }
+
+  const handleDeleteEvent = async (eventId: number) => {
+    if (!window.confirm("Delete this event?")) return
+    try {
+      await deleteEvent.mutateAsync(eventId)
+      toast.success("Event deleted")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete event"
       toast.error(message)
     }
   }
@@ -200,6 +212,14 @@ export default function SchedulePage() {
                         {event.start_time ?? "--:--"} · {event.duration ? `${event.duration}m` : "no duration"}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteEvent(event.id)}
+                      className="w-7 h-7 rounded-[6px] border border-rose-500/25 bg-[var(--rd)] text-rose-300 hover:bg-rose-500/15"
+                      title="Delete event"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                    </button>
                   </div>
                 ))}
               </div>

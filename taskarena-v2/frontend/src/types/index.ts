@@ -113,6 +113,16 @@ export interface Quiz {
   attempt_count: number
 }
 
+export interface QuizAttempt {
+  id: number
+  quiz_id: number
+  user_id: number
+  score: number | null
+  answers: Record<string, string>
+  time_taken: number | null
+  taken_at: string
+}
+
 export interface QuizQuestion {
   id: number
   quiz_id: number

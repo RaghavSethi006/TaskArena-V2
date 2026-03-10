@@ -22,7 +22,7 @@ class QuizService:
         self.db = db
         self.generator = QuizGenerator()
 
-    def get_quizzes(self, course_id: int = None) -> list[Quiz]:
+    def get_quizzes(self, course_id: int = None, user_id: int | None = None) -> list[Quiz]:
         """
         Return all quizzes, optionally filtered by course_id.
         Include question_count, best_score, attempt_count as computed fields.
@@ -45,16 +45,17 @@ class QuizService:
             .group_by(QuizQuestion.quiz_id)
             .all()
         )
-        attempt_rows = (
+        attempt_query = (
             self.db.query(
                 QuizAttempt.quiz_id.label("quiz_id"),
                 func.count(QuizAttempt.id).label("attempt_count"),
                 func.max(QuizAttempt.score).label("best_score"),
             )
             .filter(QuizAttempt.quiz_id.in_(quiz_ids))
-            .group_by(QuizAttempt.quiz_id)
-            .all()
         )
+        if user_id is not None:
+            attempt_query = attempt_query.filter(QuizAttempt.user_id == user_id)
+        attempt_rows = attempt_query.group_by(QuizAttempt.quiz_id).all()
 
         question_counts = {row.quiz_id: int(row.question_count or 0) for row in question_rows}
         attempt_counts = {row.quiz_id: int(row.attempt_count or 0) for row in attempt_rows}
