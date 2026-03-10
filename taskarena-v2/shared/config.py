@@ -1,15 +1,23 @@
+import sys
 from pathlib import Path
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
-ROOT = Path(__file__).parent.parent
+SOURCE_ROOT = Path(__file__).resolve().parent.parent
+
+if getattr(sys, "frozen", False):
+    RUNTIME_ROOT = Path(sys.executable).resolve().parent
+    RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", RUNTIME_ROOT))
+else:
+    RUNTIME_ROOT = SOURCE_ROOT
+    RESOURCE_ROOT = SOURCE_ROOT
 
 
 class Settings(BaseSettings):
     # Database
-    db_path: str = str(ROOT / "data" / "taskarena.db")
+    db_path: str = str(RUNTIME_ROOT / "data" / "taskarena.db")
 
     # API
     api_port: int = 8765
@@ -20,7 +28,7 @@ class Settings(BaseSettings):
     ai_provider: str = "groq"
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
-    local_model_path: str = str(ROOT / "models" / "qwen2.5-7b-instruct-q4_k_m.gguf")
+    local_model_path: str = str(RUNTIME_ROOT / "models" / "qwen2.5-7b-instruct-q4_k_m.gguf")
     local_n_ctx: int = 4096
     local_n_gpu_layers: int = -1
     local_n_threads: int = 8
@@ -29,7 +37,7 @@ class Settings(BaseSettings):
 
     # Embeddings
     embedding_model: str = "allenai/scibert_scivocab_uncased"
-    embedding_cache_dir: str = str(ROOT / "models" / "scibert")
+    embedding_cache_dir: str = str(RUNTIME_ROOT / "models" / "scibert")
     rag_top_k: int = 5
     chunk_size: int = 512
     chunk_overlap: int = 64
@@ -51,10 +59,14 @@ class Settings(BaseSettings):
 
     @property
     def root(self) -> Path:
-        return ROOT
+        return RUNTIME_ROOT
+
+    @property
+    def resource_root(self) -> Path:
+        return RESOURCE_ROOT
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(RUNTIME_ROOT / ".env"),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

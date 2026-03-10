@@ -18,11 +18,17 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+  // 2. keep the frontend dev server separate from the sidecar backend port
   server: {
     port: 1420,
     strictPort: true,
     host: host || false,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8765",
+        changeOrigin: false,
+      },
+    },
     hmr: host
       ? {
           protocol: "ws",
