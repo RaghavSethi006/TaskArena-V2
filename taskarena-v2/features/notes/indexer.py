@@ -31,6 +31,13 @@ class Indexer:
     def get_model(cls) -> SentenceTransformer:
         """Load model once, reuse on subsequent calls. Cache dir from settings."""
         if cls._model is None:
+            cache_dir = Path(settings.embedding_cache_dir)
+            if not cache_dir.exists():
+                raise RuntimeError(
+                    f"Embedding model not found at {cache_dir}. "
+                    "Run scripts/download_model.py first."
+                )
+            LOGGER.debug("Loading embedding model from %s", cache_dir)
             cls._model = SentenceTransformer(
                 settings.embedding_model,
                 cache_folder=settings.embedding_cache_dir,
@@ -209,8 +216,14 @@ class Indexer:
         if top_k <= 0:
             return []
 
+        LOGGER.debug(
+            "RAG search: query=%r course_id=%s folder_id=%s file_id=%s",
+            query[:60], course_id, folder_id, file_id,
+        )
+
         query_vector = self.embed_single(query)
         if query_vector.size == 0:
+            LOGGER.debug("RAG search: empty query vector, returning []")
             return []
 
         q = db.query(FileChunk).join(File).join(Folder).join(Course)
@@ -227,6 +240,12 @@ class Indexer:
             return []
 
         chunks = q.all()
+
+        LOGGER.debug(
+            "RAG search: query=%r course_id=%s folder_id=%s file_id=%s chunks_found=%d",
+            query[:60], course_id, folder_id, file_id, len(chunks),
+        )
+
         if not chunks:
             return []
 
