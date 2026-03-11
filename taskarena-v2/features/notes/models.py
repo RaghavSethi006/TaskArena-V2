@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from features.chatbot.models import ChatConversation
     from features.quiz.models import Quiz
     from features.schedule.models import ScheduleEvent
+    from features.study_materials.models import StudyMaterial
     from features.tasks.models import Task
     from shared.user_model import User
 
@@ -38,6 +39,9 @@ class Course(Base):
         "ChatConversation", back_populates="context_course"
     )
     quizzes: Mapped[list["Quiz"]] = relationship("Quiz", back_populates="course")
+    study_materials: Mapped[list["StudyMaterial"]] = relationship(
+        "StudyMaterial", back_populates="course", cascade="all, delete-orphan"
+    )
 
 
 class Folder(Base):

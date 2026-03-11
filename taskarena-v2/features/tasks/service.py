@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 import features.chatbot.models  # noqa: F401
 import features.notes.models  # noqa: F401
 import features.quiz.models  # noqa: F401
+import features.study_materials.models  # noqa: F401
 import features.schedule.models  # noqa: F401
 from features.schedule.models import ScheduleEvent
 from features.tasks.models import Task, XPLog

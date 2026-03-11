@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import sys
 from logging.config import fileConfig
@@ -19,6 +19,7 @@ import features.notes.models  # noqa: F401
 import features.chatbot.models  # noqa: F401
 import features.schedule.models  # noqa: F401
 import features.quiz.models  # noqa: F401
+import features.study_materials.models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.db_url)

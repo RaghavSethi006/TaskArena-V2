@@ -52,6 +52,7 @@ def run_migrations() -> None:
         import features.chatbot.models  # noqa: F401
         import features.notes.models  # noqa: F401
         import features.quiz.models  # noqa: F401
+        import features.study_materials.models  # noqa: F401
         import features.schedule.models  # noqa: F401
         import features.tasks.models  # noqa: F401
         import shared.user_model  # noqa: F401

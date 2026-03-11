@@ -44,6 +44,8 @@ export interface Course {
   folder_count?: number
   file_count?: number
   quiz_count?: number
+  notes_count?: number
+  sheets_count?: number
 }
 
 export interface Folder {
@@ -173,4 +175,58 @@ export interface AIConfig {
   local_model_exists: boolean
   ollama_available: boolean
   ollama_url: string
+}
+
+export type StudyMaterialType = "study_notes" | "formula_sheet" | "qa" | "practice_exam"
+
+export interface StudyNotesContent {
+  title: string
+  sections: { heading: string; bullets: string[] }[]
+}
+
+export interface FormulaSheetContent {
+  title: string
+  entries: {
+    name: string
+    formula: string
+    explanation: string
+    variables: { symbol: string; meaning: string }[]
+    example: string
+  }[]
+}
+
+export interface QAContent {
+  title: string
+  items: {
+    question: string
+    short_answer: string
+    long_answer: string
+    hints: string[]
+  }[]
+}
+
+export interface PracticeExamContent {
+  title: string
+  duration_minutes: number
+  total_marks: number
+  sections: {
+    name: string
+    questions: {
+      number: number
+      question: string
+      marks: number
+      model_answer: string
+    }[]
+  }[]
+}
+
+export interface StudyMaterial {
+  id: number
+  course_id: number
+  folder_id: number | null
+  file_id: number | null
+  type: StudyMaterialType
+  title: string
+  content: StudyNotesContent | FormulaSheetContent | QAContent | PracticeExamContent
+  created_at: string
 }

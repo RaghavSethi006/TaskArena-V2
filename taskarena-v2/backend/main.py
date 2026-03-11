@@ -1,7 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from sqlalchemy import inspect
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.middleware import setup_middleware
 from backend.routers import (
@@ -12,6 +15,7 @@ from backend.routers import (
     quiz,
     schedule,
     stats,
+    study_materials,
     tasks,
 )
 from shared.config import settings
@@ -26,6 +30,37 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logger = logging.getLogger("taskarena")
 
 
+def run_migrations_if_needed() -> None:
+    db_path = Path(settings.db_path)
+    if not db_path.exists():
+        logger.warning(f"Database not found at {settings.db_path} — running migrations")
+
+    alembic_ini = settings.resource_root / "alembic.ini"
+    alembic_dir = settings.resource_root / "alembic"
+    if not alembic_ini.exists() or not alembic_dir.exists():
+        logger.warning("Migrations skipped: alembic resources not found")
+        return
+
+    try:
+        inspector = inspect(engine)
+        if inspector.has_table("study_materials"):
+            return
+    except SQLAlchemyError as exc:
+        logger.warning("Database inspection failed; skipping migrations", exc_info=exc)
+        return
+
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        alembic_cfg = Config(str(alembic_ini))
+        alembic_cfg.set_main_option("script_location", str(alembic_dir))
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied")
+    except Exception as exc:
+        logger.error("Failed to run migrations", exc_info=exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
@@ -33,14 +68,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Database: {settings.db_path}")
     logger.info(f"AI provider: {settings.ai_provider}")
 
-    # Verify DB file exists
-    from pathlib import Path
-
-    if not Path(settings.db_path).exists():
-        logger.warning(
-            f"Database not found at {settings.db_path} — run: alembic upgrade head"
-        )
-
+    run_migrations_if_needed()
     yield
 
     logger.info("TaskArena backend shutting down.")
@@ -82,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(chatbot.router, prefix="/api")
     app.include_router(schedule.router, prefix="/api")
     app.include_router(quiz.router, prefix="/api")
+    app.include_router(study_materials.router, prefix="/api")
     app.include_router(leaderboard.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
     app.include_router(profile.router, prefix="/api")
@@ -90,3 +119,5 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+

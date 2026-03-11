@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
-import type { Course, Quiz, QuizAttempt, QuizQuestion } from "@/types"
+import type { Course, Quiz, QuizAttempt, QuizQuestion, StudyMaterial, StudyMaterialType } from "@/types"
+import { toast } from "sonner"
 
 interface QuizGenerateRequest {
   title: string
@@ -25,19 +26,34 @@ export function useStudyHubCourses() {
     queryKey: ["study-hub", "courses"],
     queryFn: async () => {
       const courses = await api.get<Course[]>("/notes/courses")
-      const counts = await Promise.all(
-        courses.map((course) =>
-          api
-            .get<Quiz[]>(`/quizzes?course_id=${course.id}`)
-            .then((quizzes) => ({ id: course.id, quiz_count: quizzes.length }))
-            .catch(() => ({ id: course.id, quiz_count: 0 }))
-        )
+      const perCourse = await Promise.all(
+        courses.map(async (course) => {
+          const [quizzes, notes, sheets] = await Promise.all([
+            api
+              .get<Quiz[]>(`/quizzes?course_id=${course.id}`)
+              .then((q) => q.length)
+              .catch(() => 0),
+            api
+              .get<StudyMaterial[]>(`/study-materials?course_id=${course.id}&type=study_notes`)
+              .then((m) => m.length)
+              .catch(() => 0),
+            api
+              .get<StudyMaterial[]>(`/study-materials?course_id=${course.id}&type=formula_sheet`)
+              .then((m) => m.length)
+              .catch(() => 0),
+          ])
+          return { id: course.id, quiz_count: quizzes, notes_count: notes, sheets_count: sheets }
+        })
       )
-
-      return courses.map((course) => ({
-        ...course,
-        quiz_count: counts.find((item) => item.id === course.id)?.quiz_count ?? 0,
-      }))
+      return courses.map((course) => {
+        const counts = perCourse.find((c) => c.id === course.id)
+        return {
+          ...course,
+          quiz_count: counts?.quiz_count ?? 0,
+          notes_count: counts?.notes_count ?? 0,
+          sheets_count: counts?.sheets_count ?? 0,
+        }
+      })
     },
   })
 }
@@ -105,5 +121,31 @@ export function useQuizAttempts(quizId: number | null) {
     queryKey: ["study-hub", "quiz-attempts", quizId],
     queryFn: () => api.get<QuizAttempt[]>(`/quizzes/${quizId}/attempts`),
     enabled: quizId !== null,
+  })
+}
+
+export function useStudyMaterials(courseId: number | null, type: StudyMaterialType | null) {
+  return useQuery({
+    queryKey: ["study-hub", "materials", courseId, type],
+    queryFn: () =>
+      api.get<StudyMaterial[]>(
+        `/study-materials?course_id=${courseId}${type ? `&type=${type}` : ""}`
+      ),
+    enabled: courseId !== null && type !== null,
+  })
+}
+
+export function useDeleteStudyMaterial() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (materialId: number) => api.delete<void>(`/study-materials/${materialId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["study-hub", "materials"] })
+      qc.invalidateQueries({ queryKey: ["study-hub", "courses"] })
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Failed to delete"
+      toast.error(message)
+    },
   })
 }

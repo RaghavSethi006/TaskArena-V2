@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 import features.chatbot.models  # noqa: F401
 import features.notes.models  # noqa: F401
 import features.quiz.models  # noqa: F401
+import features.study_materials.models  # noqa: F401
 import shared.user_model  # noqa: F401
 from features.chatbot.ai_service import get_ai
 from features.schedule.models import ScheduleEvent

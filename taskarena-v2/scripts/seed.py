@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from features.chatbot.models import ChatConversation, ChatMessage
 from features.notes.models import Course, Folder
 import features.quiz.models  # noqa: F401
+import features.study_materials.models  # noqa: F401
 from features.schedule.models import ScheduleEvent
 from features.tasks.models import Task, XPLog
 from shared.database import SessionLocal

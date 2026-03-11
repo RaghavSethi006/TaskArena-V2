@@ -1,4 +1,4 @@
-﻿"""
+"""
 Drops all tables and recreates them. Dev use only.
 Run: python scripts/reset_db.py
 """
@@ -17,6 +17,7 @@ import features.notes.models  # noqa: F401
 import features.chatbot.models  # noqa: F401
 import features.schedule.models  # noqa: F401
 import features.quiz.models  # noqa: F401
+import features.study_materials.models  # noqa: F401
 
 if __name__ == "__main__":
     print("Dropping all tables...")
