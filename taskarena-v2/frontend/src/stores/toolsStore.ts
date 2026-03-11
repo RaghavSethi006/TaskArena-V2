@@ -9,6 +9,13 @@ interface ToolEntry {
   position: { x: number; y: number }
 }
 
+interface PomodoroPreset {
+  name: string
+  focus: number
+  short: number
+  long: number
+}
+
 interface PomodoroState {
   mode: "focus" | "short" | "long"
   secondsLeft: number
@@ -16,6 +23,8 @@ interface PomodoroState {
   session: number
   linkedTaskId: number | null
   linkedTaskTitle: string | null
+  customDurations: { focus: number; short: number; long: number }
+  presets: PomodoroPreset[]
 }
 
 interface StopwatchState {
@@ -40,6 +49,10 @@ interface ToolsStore {
   pomodoroToggle: () => void
   pomodoroReset: () => void
   pomodoroSetMode: (mode: "focus" | "short" | "long") => void
+  pomodoroSetDurations: (durations: { focus: number; short: number; long: number }) => void
+  pomodoroSavePreset: (name: string) => void
+  pomodoroLoadPreset: (index: number) => void
+  pomodoroDeletePreset: (index: number) => void
   pomodoroLink: (taskId: number, title: string) => void
 
   stopwatchToggle: () => void
@@ -48,7 +61,7 @@ interface ToolsStore {
   stopwatchTick: () => void
 }
 
-const POMODORO_DURATIONS = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 }
+const defaultPomodoroDurations = { focus: 25, short: 5, long: 15 }
 
 const defaultTool = (state: ToolState = "closed"): ToolEntry => ({
   state,
@@ -68,11 +81,13 @@ export const useToolsStore = create<ToolsStore>()(
       },
       pomodoro: {
         mode: "focus",
-        secondsLeft: POMODORO_DURATIONS.focus,
+        secondsLeft: 25 * 60,
         running: false,
         session: 1,
         linkedTaskId: null,
         linkedTaskTitle: null,
+        customDurations: { ...defaultPomodoroDurations },
+        presets: [],
       },
       stopwatch: { running: false, startedAt: null, elapsed: 0, laps: [] },
 
@@ -106,7 +121,7 @@ export const useToolsStore = create<ToolsStore>()(
                 running: false,
                 mode: nextMode,
                 session: nextSession > 4 ? 1 : nextSession,
-                secondsLeft: POMODORO_DURATIONS[nextMode],
+                secondsLeft: p.customDurations[nextMode] * 60,
               },
             }
           }
@@ -121,7 +136,7 @@ export const useToolsStore = create<ToolsStore>()(
           pomodoro: {
             ...s.pomodoro,
             running: false,
-            secondsLeft: POMODORO_DURATIONS[s.pomodoro.mode],
+            secondsLeft: s.pomodoro.customDurations[s.pomodoro.mode] * 60,
           },
         })),
 
@@ -131,7 +146,58 @@ export const useToolsStore = create<ToolsStore>()(
             ...s.pomodoro,
             mode,
             running: false,
-            secondsLeft: POMODORO_DURATIONS[mode],
+            secondsLeft: s.pomodoro.customDurations[mode] * 60,
+          },
+        })),
+
+      pomodoroSetDurations: (durations) =>
+        set((s) => ({
+          pomodoro: {
+            ...s.pomodoro,
+            customDurations: durations,
+            running: false,
+            secondsLeft: durations[s.pomodoro.mode] * 60,
+          },
+        })),
+
+      pomodoroSavePreset: (name) =>
+        set((s) => {
+          const trimmed = name.trim()
+          if (!trimmed) return s
+          const existing = s.pomodoro.presets.findIndex(
+            (p) => p.name.toLowerCase() === trimmed.toLowerCase()
+          )
+          const newPreset: PomodoroPreset = {
+            name: trimmed,
+            ...s.pomodoro.customDurations,
+          }
+          const presets =
+            existing >= 0
+              ? s.pomodoro.presets.map((p, i) => (i === existing ? newPreset : p))
+              : [...s.pomodoro.presets, newPreset]
+          return { pomodoro: { ...s.pomodoro, presets } }
+        }),
+
+      pomodoroLoadPreset: (index) =>
+        set((s) => {
+          const preset = s.pomodoro.presets[index]
+          if (!preset) return s
+          const durations = { focus: preset.focus, short: preset.short, long: preset.long }
+          return {
+            pomodoro: {
+              ...s.pomodoro,
+              customDurations: durations,
+              running: false,
+              secondsLeft: durations[s.pomodoro.mode] * 60,
+            },
+          }
+        }),
+
+      pomodoroDeletePreset: (index) =>
+        set((s) => ({
+          pomodoro: {
+            ...s.pomodoro,
+            presets: s.pomodoro.presets.filter((_, i) => i !== index),
           },
         })),
 
@@ -179,6 +245,23 @@ export const useToolsStore = create<ToolsStore>()(
         pomodoro: { ...s.pomodoro, running: false },
         stopwatch: { ...s.stopwatch, running: false },
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<ToolsStore>
+        return {
+          ...currentState,
+          ...persisted,
+          pomodoro: {
+            ...currentState.pomodoro,
+            ...persisted.pomodoro,
+            customDurations: persisted.pomodoro?.customDurations ?? currentState.pomodoro.customDurations,
+            presets: persisted.pomodoro?.presets ?? currentState.pomodoro.presets,
+          },
+          stopwatch: {
+            ...currentState.stopwatch,
+            ...persisted.stopwatch,
+          },
+        }
+      },
     }
   )
 )
