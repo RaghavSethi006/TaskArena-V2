@@ -146,7 +146,7 @@ class ScheduleAI:
 
     async def generate_suggestions(
         self, user_id: int, db: Session, provider: str = "groq"
-    ) -> list[dict]:
+    ) -> tuple[list[dict], str]:
         """
         Full pipeline:
         1. analyze_workload -> tasks
@@ -162,7 +162,7 @@ class ScheduleAI:
         """
         tasks = self.analyze_workload(user_id=user_id, db=db)
         if not tasks:
-            return []
+            return [], "No pending tasks with upcoming deadlines found. Add tasks with due dates to get suggestions."
 
         events = self.get_existing_events(user_id=user_id, db=db)
         today = date.today().strftime("%Y-%m-%d")
@@ -182,17 +182,18 @@ class ScheduleAI:
             )
         except Exception as exc:
             print(f"Warning: AI suggestions failed ({exc}).")
-            return []
+            return [], f"AI provider error: {exc}"
 
         try:
             suggestions = self._parse_suggestions(raw)
-        except Exception:
-            suggestions = []
+        except Exception as exc:
+            print(f"Warning: Failed to parse AI suggestions: {exc}")
+            return [], "AI returned an unexpected response format. Try again."
 
         if not suggestions:
             print("Warning: AI returned malformed or empty suggestions JSON.")
-            return []
-        return suggestions
+            return [], "AI returned no suggestions. Try again or add more tasks with deadlines."
+        return suggestions, ""
 
     def _parse_suggestions(self, raw: str) -> list[dict]:
         """

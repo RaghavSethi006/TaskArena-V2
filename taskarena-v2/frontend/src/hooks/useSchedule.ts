@@ -12,6 +12,11 @@ interface ScheduleSuggestion {
   priority?: "high" | "medium" | "low"
 }
 
+interface SuggestionsResponse {
+  suggestions: ScheduleSuggestion[]
+  message: string
+}
+
 interface CreateEventInput {
   title: string
   type: "study" | "assignment" | "exam" | "break" | "other"
@@ -49,8 +54,9 @@ export function useCreateEvent() {
 export function useSuggestions(provider: "groq" | "local" | "ollama" = "groq") {
   return useQuery({
     queryKey: ["schedule", "suggestions", provider],
-    queryFn: () => api.get<{ suggestions: ScheduleSuggestion[] }>(`/schedule/suggestions?provider=${provider}`),
+    queryFn: () => api.get<SuggestionsResponse>(`/schedule/suggestions?provider=${provider}`),
     enabled: false,
+    retry: false,
   })
 }
 

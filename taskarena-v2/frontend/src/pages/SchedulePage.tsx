@@ -243,28 +243,73 @@ export default function SchedulePage() {
             <button
               type="button"
               onClick={() => void suggestionsQuery.refetch()}
-              className="h-8 px-3 rounded-[7px] bg-violet-500 text-white text-[12px] hover:bg-violet-600"
+              disabled={suggestionsQuery.isFetching}
+              className="h-8 px-3 rounded-[7px] bg-violet-500 text-white text-[12px] hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
-              Get AI Suggestions
+              {suggestionsQuery.isFetching ? (
+                <>
+                  <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Get AI Suggestions
+                </>
+              )}
             </button>
+            {suggestionsQuery.isError && (
+              <div className="mt-2 rounded-[7px] border border-rose-500/25 bg-rose-500/10 px-3 py-2">
+                <p className="text-[11px] text-rose-300">
+                  {suggestionsQuery.error instanceof Error
+                    ? suggestionsQuery.error.message
+                    : "Failed to get suggestions"}
+                </p>
+              </div>
+            )}
             <div className="mt-3 space-y-2">
+              {suggestionsQuery.data !== undefined && visibleSuggestions.length === 0 && !suggestionsQuery.isFetching && (
+                <div className="rounded-[7px] border border-b1 bg-s2/40 px-3 py-3 text-center">
+                  <p className="text-[12px] text-tx2">
+                    {suggestionsQuery.data.message || "No suggestions available."}
+                  </p>
+                </div>
+              )}
               {visibleSuggestions.map((suggestion) => {
                 const key = `${suggestion.title}-${suggestion.date}-${suggestion.start_time}`
                 return (
                   <div key={key} className="rounded-[7px] border border-b1 bg-s2/40 p-2">
-                    <p className="text-[12px] text-tx">{suggestion.title}</p>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-[12px] text-tx">{suggestion.title}</p>
+                      {suggestion.priority && (
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-[4px] flex-shrink-0 ${
+                          suggestion.priority === "high"
+                            ? "bg-rose-500/15 text-rose-300"
+                            : suggestion.priority === "medium"
+                              ? "bg-amber-500/15 text-amber-300"
+                              : "bg-emerald-500/15 text-emerald-300"
+                        }`}>
+                          {suggestion.priority}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-tx3 font-mono">
-                      {suggestion.date} {suggestion.start_time}
+                      {suggestion.date} · {suggestion.start_time} · {suggestion.duration}min
                     </p>
                     <p className="text-[11px] text-tx2 mt-1">{suggestion.reason ?? "AI-generated suggestion"}</p>
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
                         onClick={async () => {
-                          await acceptSuggestion.mutateAsync(suggestion)
-                          toast.success("Suggestion scheduled")
+                          try {
+                            await acceptSuggestion.mutateAsync(suggestion)
+                            toast.success("Suggestion scheduled")
+                          } catch {
+                            toast.error("Failed to schedule suggestion")
+                          }
                         }}
-                        className="h-7 px-2 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600"
+                        disabled={acceptSuggestion.isPending}
+                        className="h-7 px-2 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600 disabled:opacity-50"
                       >
                         Schedule it
                       </button>

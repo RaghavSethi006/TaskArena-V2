@@ -111,7 +111,7 @@ class ScheduleService:
             month_end = date(year, month + 1, 1) - timedelta(days=1)
         return self.get_events(user_id=user_id, date_from=month_start, date_to=month_end)
 
-    async def get_ai_suggestions(self, user_id: int, provider: str = "groq") -> list[dict]:
+    async def get_ai_suggestions(self, user_id: int, provider: str = "groq") -> tuple[list[dict], str]:
         """Delegate to self.ai.generate_suggestions()."""
         return await self.ai.generate_suggestions(user_id=user_id, db=self.db, provider=provider)
 

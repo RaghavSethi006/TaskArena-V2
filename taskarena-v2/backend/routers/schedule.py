@@ -63,8 +63,8 @@ async def get_suggestions(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    suggestions = await ScheduleService(db).get_ai_suggestions(user_id, provider)
-    return {"suggestions": suggestions}
+    suggestions, message = await ScheduleService(db).get_ai_suggestions(user_id, provider)
+    return {"suggestions": suggestions, "message": message}
 
 
 @router.post("/suggestions/accept", response_model=EventOut, status_code=status.HTTP_201_CREATED)
