@@ -71,6 +71,12 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fadeUp { animation: fadeUp 0.18s ease both; }
+/* Slide-in right */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slideInRight { animation: slideInRight 0.18s ease-out; }
 
 /* Typing dots */
 @keyframes tdot {
@@ -80,3 +86,4 @@
 .animate-tdot1 { animation: tdot 1.4s infinite; }
 .animate-tdot2 { animation: tdot 1.4s 0.2s infinite; }
 .animate-tdot3 { animation: tdot 1.4s 0.4s infinite; }
+

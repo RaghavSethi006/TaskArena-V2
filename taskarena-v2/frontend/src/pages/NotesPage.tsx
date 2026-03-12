@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog"
-import { BookOpen, FileText, Folder as FolderIcon, Plus, Search, Trash2, Upload } from "lucide-react"
+import { open as shellOpen } from "@tauri-apps/plugin-shell"
+import { BookOpen, Eye, EyeOff, FileText, Folder as FolderIcon, Plus, Search, Trash2, Upload, X } from "lucide-react"
 import { useMemo, useState } from "react"
 import EmptyState from "@/components/shared/EmptyState"
 import LoadingSkeleton from "@/components/shared/LoadingSkeleton"
@@ -40,6 +41,9 @@ export default function NotesPage() {
   const [newFolderName, setNewFolderName] = useState("")
   const [search, setSearch] = useState("")
   const [indexingId, setIndexingId] = useState<number | null>(null)
+  const [autoIndex, setAutoIndex] = useState(true)
+  const [previewFile, setPreviewFile] = useState<import("@/types").File | null>(null)
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set())
 
   const coursesQuery = useCourses()
   const foldersQuery = useFolders(selectedCourse?.id ?? null)
@@ -58,26 +62,53 @@ export default function NotesPage() {
     return { folderCount: folders.length, fileCount }
   }, [filesQuery.data?.length, foldersQuery.data])
 
-  const pickFile = async () => {
+  const pickFiles = async () => {
     if (!selectedFolder) return
 
-    let pickedPath: string | null = null
+    let pickedPaths: string[] = []
     try {
       const result = await open({
-        multiple: false,
+        multiple: true,
         filters: [{ name: "Documents", extensions: ["pdf", "docx", "txt", "md"] }],
       })
-      pickedPath = Array.isArray(result) ? result[0] ?? null : result
+      if (!result) return
+      pickedPaths = Array.isArray(result) ? result : [result]
     } catch {
-      const manual = window.prompt("Paste file path")
-      pickedPath = manual?.trim() || null
+      const manual = window.prompt("Paste file path (one path only)")
+      if (manual?.trim()) pickedPaths = [manual.trim()]
     }
 
-    if (!pickedPath) return
+    if (pickedPaths.length === 0) return
 
-    const name = pickedPath.split(/[\\/]/).pop() ?? "file"
-    await createFile.mutateAsync({ folderId: selectedFolder.id, name, path: pickedPath })
-    toast.success("File added")
+    let added = 0
+    for (const pickedPath of pickedPaths) {
+      const name = pickedPath.split(/[\\/]/).pop() ?? "file"
+      try {
+        const file = await createFile.mutateAsync({
+          folderId: selectedFolder.id,
+          name,
+          path: pickedPath,
+        })
+
+        added++
+
+        if (autoIndex) {
+          indexFile.mutateAsync({ fileId: file.id }).catch(() => {
+            // silently ignore index failures; user can retry manually
+          })
+        }
+      } catch {
+        toast.error(`Failed to add: ${name}`)
+      }
+    }
+
+    if (added > 0) {
+      toast.success(
+        autoIndex
+          ? `${added} file${added > 1 ? "s" : ""} added and indexing in background`
+          : `${added} file${added > 1 ? "s" : ""} added`
+      )
+    }
   }
 
   const createCourseHandler = async () => {
@@ -120,6 +151,33 @@ export default function NotesPage() {
     } finally {
       setIndexingId(null)
     }
+  }
+  const openInOS = async (path: string) => {
+    try {
+      await shellOpen(path)
+    } catch {
+      toast.error("Could not open file — check that the path still exists.")
+    }
+  }
+
+  const toggleFileSelection = (fileId: number) => {
+    setSelectedFileIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(fileId)) next.delete(fileId)
+      else next.add(fileId)
+      return next
+    })
+  }
+
+  const bulkDelete = async () => {
+    if (!selectedFolder) return
+    const count = selectedFileIds.size
+    if (!window.confirm(`Delete ${count} file${count > 1 ? "s" : ""}? This cannot be undone.`)) return
+    for (const fileId of selectedFileIds) {
+      await deleteFile.mutateAsync({ fileId, folderId: selectedFolder.id })
+    }
+    setSelectedFileIds(new Set())
+    toast.success(`${count} file${count > 1 ? "s" : ""} deleted`)
   }
 
   if (coursesQuery.isLoading) {
@@ -217,6 +275,8 @@ export default function NotesPage() {
                 onClick={() => {
                   setSelectedCourse(null)
                   setSelectedFolder(null)
+                  setSelectedFileIds(new Set())
+                  setPreviewFile(null)
                   setSearch("")
                 }}
                 className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3"
@@ -234,7 +294,11 @@ export default function NotesPage() {
                   <button
                     key={folder.id}
                     type="button"
-                    onClick={() => setSelectedFolder(folder)}
+                    onClick={() => {
+                      setSelectedFolder(folder)
+                      setSelectedFileIds(new Set())
+                      setPreviewFile(null)
+                    }}
                     className={`w-full text-left rounded-[7px] px-2 py-2 text-[12px] border transition-colors duration-[120ms] ${
                       selectedFolder?.id === folder.id ? "border-blue-500/30 bg-[var(--bd)] text-blue-200" : "border-transparent hover:bg-s2 text-tx2"
                     }`}
@@ -278,13 +342,26 @@ export default function NotesPage() {
                         className="bg-transparent flex-1 text-[12px] text-tx outline-none"
                       />
                     </div>
+                    {/* Auto-index toggle */}
                     <button
                       type="button"
-                      onClick={() => void pickFile()}
+                      onClick={() => setAutoIndex((v) => !v)}
+                      title={autoIndex ? "Auto-index ON — click to disable" : "Auto-index OFF — click to enable"}
+                      className={`h-8 px-2.5 rounded-[7px] border text-[11px] font-mono inline-flex items-center gap-1.5 transition-colors ${
+                        autoIndex
+                          ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/20"
+                          : "bg-s2 border-b1 text-tx3 hover:bg-s3"
+                      }`}
+                    >
+                      {"\u26A1"} Auto-index {autoIndex ? "ON" : "OFF"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void pickFiles()}
                       className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 inline-flex items-center gap-1.5"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      Add File
+                      Add Files
                     </button>
                   </div>
 
@@ -299,49 +376,187 @@ export default function NotesPage() {
                     </div>
                   ) : null}
 
-                  <div className="space-y-2">
-                    {(filesQuery.data ?? []).map((file) => (
-                      <div key={file.id} className="rounded-[7px] border border-b1 bg-s2/40 p-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[12px] text-tx truncate inline-flex items-center gap-1.5">
-                              <FileText className="w-3.5 h-3.5 text-tx3" />
-                              {file.name}
-                            </p>
-                            <p className="text-[10px] text-tx3 font-mono truncate">{file.original_path ?? file.path}</p>
-                            <p className="text-[10px] text-tx3 font-mono">{formatSize(file.size)}</p>
+                  {/* Bulk action bar */}
+                  {selectedFileIds.size > 0 && (
+                    <div className="mb-2 flex items-center gap-2 rounded-[8px] border border-rose-500/25 bg-[var(--rd)] px-3 py-2">
+                      <span className="text-[12px] text-rose-300 flex-1">
+                        {selectedFileIds.size} file{selectedFileIds.size > 1 ? "s" : ""} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFileIds(new Set())}
+                        className="h-7 px-2 rounded-[6px] border border-b1 bg-s2 text-[11px] text-tx2 hover:bg-s3"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void bulkDelete()}
+                        className="h-7 px-2 rounded-[6px] bg-rose-500 text-white text-[11px] hover:bg-rose-600"
+                      >
+                        Delete Selected
+                      </button>
+                    </div>
+                  )}
+
+                  <div
+                    className={`space-y-2 transition-all duration-200 ${previewFile ? "xl:mr-[280px]" : ""}`}
+                  >
+                    {(filesQuery.data ?? []).map((file) => {
+                      const isSelected = selectedFileIds.has(file.id)
+                      return (
+                        <div
+                          key={file.id}
+                          onClick={() => setPreviewFile(file)}
+                          onDoubleClick={() => void openInOS(file.path)}
+                          className={`rounded-[7px] border bg-s2/40 p-2 cursor-default select-none transition-colors ${
+                            isSelected ? "border-blue-500/40 bg-[var(--bd)]" : "border-b1 hover:bg-s2/70"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            {/* Checkbox */}
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleFileSelection(file.id)}
+                              className="mt-1 flex-shrink-0 accent-blue-500"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] text-tx truncate inline-flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-tx3" />
+                                {file.name}
+                              </p>
+                              <p className="text-[10px] text-tx3 font-mono truncate">{file.original_path ?? file.path}</p>
+                              <p className="text-[10px] text-tx3 font-mono">{formatSize(file.size)}</p>
+                            </div>
+
+                            <div className="flex gap-1 flex-shrink-0">
+                              {/* Preview toggle */}
+                              <button
+                                type="button"
+                                title="Preview"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setPreviewFile((prev) => (prev?.id === file.id ? null : file))
+                                }}
+                                className={`h-7 px-2 rounded-[7px] border text-[11px] transition-colors ${
+                                  previewFile?.id === file.id
+                                    ? "border-blue-500/30 bg-[var(--bd)] text-blue-300"
+                                    : "border-b1 bg-s2 text-tx2 hover:bg-s3"
+                                }`}
+                              >
+                                {previewFile?.id === file.id ? (
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Eye className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void indexFileHandler(file.id)
+                                }}
+                                className="h-7 px-2 rounded-[7px] border border-b1 bg-s2 text-[11px] text-tx2 hover:bg-s3"
+                                disabled={indexingId === file.id}
+                              >
+                                {indexingId === file.id ? "Indexing..." : "Index"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void deleteFile.mutateAsync({ fileId: file.id, folderId: selectedFolder.id })
+                                }}
+                                className="h-7 px-2 rounded-[7px] border border-rose-500/25 bg-[var(--rd)] text-[11px] text-rose-300"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => void indexFileHandler(file.id)}
-                              className="h-7 px-2 rounded-[7px] border border-b1 bg-s2 text-[11px] text-tx2 hover:bg-s3"
-                              disabled={indexingId === file.id}
-                            >
-                              {indexingId === file.id ? "Indexing..." : "Index"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void deleteFile.mutateAsync({ fileId: file.id, folderId: selectedFolder.id })}
-                              className="h-7 px-2 rounded-[7px] border border-rose-500/25 bg-[var(--rd)] text-[11px] text-rose-300"
-                            >
-                              Delete
-                            </button>
+                          <div className="mt-1 flex items-center gap-2 text-[10px] font-mono pl-5">
+                            <span className={file.indexed ? "text-emerald-300" : "text-tx3"}>
+                              {file.indexed ? "indexed" : "not indexed"}
+                            </span>
+                            {file.indexed && (
+                              <span className="text-tx3">{file.chunk_count} chunks</span>
+                            )}
+                            <span className="text-tx3 ml-auto">Double-click to open</span>
                           </div>
                         </div>
-                        <div className="mt-1 flex items-center gap-2 text-[10px] font-mono">
-                          <span className={file.indexed ? "text-emerald-300" : "text-tx3"}>
-                            {file.indexed ? "indexed" : "not indexed"}
-                          </span>
-                          <span className="text-[10px] text-tx3 font-mono">
-                            {file.indexed ? `${file.chunk_count} chunks` : "not indexed"}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                      )
+                    })}
+                  </div>                </>
               )}
+            {/* Preview sidebar — fixed right panel, shown when previewFile is set */}
+            {previewFile && (
+              <div className="fixed top-0 right-0 h-full w-[280px] border-l border-b1 bg-s1 z-40 flex flex-col shadow-2xl animate-slideInRight">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-b1">
+                  <p className="text-[12px] font-semibold text-tx truncate">{previewFile.name}</p>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile(null)}
+                    className="w-6 h-6 rounded-[5px] text-tx3 hover:text-tx hover:bg-s2 flex items-center justify-center"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                  {/* Metadata */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-mono text-tx3 uppercase tracking-wide">File Info</p>
+                    <div className="space-y-1.5">
+                      {[
+                        { label: "Name", value: previewFile.name },
+                        { label: "Size", value: formatSize(previewFile.size) },
+                        { label: "Index status", value: previewFile.indexed ? "Indexed" : "Not indexed" },
+                        { label: "Chunks", value: previewFile.indexed ? String(previewFile.chunk_count ?? 0) : "—" },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex justify-between items-start gap-2">
+                          <span className="text-[11px] text-tx3 font-mono flex-shrink-0">{label}</span>
+                          <span className={`text-[11px] text-right break-all ${
+                            label === "Index status"
+                              ? previewFile.indexed ? "text-emerald-300" : "text-tx3"
+                              : "text-tx2"
+                          }`}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Path */}
+                  <div>
+                    <p className="text-[10px] font-mono text-tx3 uppercase tracking-wide mb-1">Path</p>
+                    <p className="text-[10px] font-mono text-tx3 break-all leading-relaxed bg-s2 rounded-[6px] border border-b1 p-2">
+                      {previewFile.path ?? "—"}
+                    </p>
+                  </div>
+
+                  {/* Quick actions */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-mono text-tx3 uppercase tracking-wide">Actions</p>
+                    <button
+                      type="button"
+                      onClick={() => void openInOS(previewFile.path)}
+                      className="w-full h-8 rounded-[7px] border border-b1 bg-s2 text-[11px] text-tx2 hover:bg-s3 inline-flex items-center justify-center gap-1.5"
+                    >
+                      Open in OS
+                    </button>
+                    <button
+                      type="button"
+                      disabled={indexingId === previewFile.id}
+                      onClick={() => void indexFileHandler(previewFile.id)}
+                      className="w-full h-8 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                    >
+                      {indexingId === previewFile.id ? "Indexing..." : previewFile.indexed ? "Re-index" : "Index Now"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             </section>
           </div>
         </div>
@@ -409,3 +624,17 @@ export default function NotesPage() {
     </>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
