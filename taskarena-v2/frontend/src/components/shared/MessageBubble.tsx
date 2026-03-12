@@ -1,5 +1,8 @@
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 import { Bot, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -53,8 +56,11 @@ export default function MessageBubble({
             [&_hr]:border-b1 [&_hr]:my-3
             [&_table]:w-full [&_table]:text-[11px] [&_table]:border-collapse [&_table]:mb-2
             [&_th]:border [&_th]:border-b1 [&_th]:bg-s2 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold
-            [&_td]:border [&_td]:border-b1 [&_td]:px-2 [&_td]:py-1">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            [&_td]:border [&_td]:border-b1 [&_td]:px-2 [&_td]:py-1
+            [&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto">
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {content}
+            </ReactMarkdown>
             {isStreaming ? (
               <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-tx3 animate-pulse" />
             ) : null}
