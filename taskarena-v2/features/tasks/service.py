@@ -73,10 +73,14 @@ class TaskService:
     def update_task(self, task_id: int, data: TaskUpdate) -> Task:
         """Update task fields. Only update fields that are not None in data. Raise ValueError if not found."""
         task = self.get_task(task_id)
-        updates = data.model_dump(exclude_none=True)
+        updates = data.model_dump(exclude_unset=True)
 
-        if "status" in updates:
-            new_status = updates["status"]
+        for key in ("status", "type", "title", "points"):
+            if key in updates and updates[key] is None:
+                updates.pop(key)
+
+        new_status = updates.get("status")
+        if new_status is not None:
             if new_status == "completed":
                 task.completed_at = task.completed_at or datetime.utcnow()
             elif new_status == "pending":

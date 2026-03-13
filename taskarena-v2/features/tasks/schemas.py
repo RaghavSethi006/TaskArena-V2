@@ -16,9 +16,11 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     subject: Optional[str] = None
+    type: Optional[Literal["assignment", "study", "productivity"]] = None
     status: Optional[Literal["pending", "completed"]] = None
     deadline: Optional[date] = None
     points: Optional[int] = None
+    course_id: Optional[int] = None
 
 
 class TaskOut(BaseModel):
