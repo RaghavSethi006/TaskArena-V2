@@ -33,6 +33,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "firebase": "^12.10.0",
     "framer-motion": "^12.35.0",
     "katex": "^0.16.38",
     "lucide-react": "^0.577.0",
