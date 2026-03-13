@@ -14,6 +14,7 @@ interface TaskCardProps {
   task: Task
   onComplete: (id: number) => void
   onDelete: (id: number) => void
+  onEdit?: (task: Task) => void
   onFocus?: (task: Task) => void
   compact?: boolean
 }
@@ -24,7 +25,7 @@ function typeChipClass(type: Task["type"]) {
   return "bg-[var(--gd)] text-emerald-300 border-emerald-500/25"
 }
 
-export default function TaskCard({ task, onComplete, onDelete, onFocus, compact = false }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onDelete, onEdit, onFocus, compact = false }: TaskCardProps) {
   const completed = task.status === "completed"
 
   return (
@@ -81,7 +82,12 @@ export default function TaskCard({ task, onComplete, onDelete, onFocus, compact 
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-s1 border-b1">
-            <DropdownMenuItem className="text-[12px] text-tx2 cursor-default">Edit (v2.1)</DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-[12px] text-tx2 cursor-pointer"
+              onClick={() => onEdit?.(task)}
+            >
+              Edit
+            </DropdownMenuItem>
             <DropdownMenuItem className="text-[12px] text-rose-300" onClick={() => onDelete(task.id)}>
               Delete
             </DropdownMenuItem>

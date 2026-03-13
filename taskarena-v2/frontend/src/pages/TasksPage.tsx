@@ -9,7 +9,7 @@ import TaskCard from "@/components/shared/TaskCard"
 import { api } from "@/api/client"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { useCreateTask, useTasks, useCompleteTask, useDeleteTask, useUncompleteTask } from "@/hooks/useTasks"
+import { useCreateTask, useTasks, useCompleteTask, useDeleteTask, useUncompleteTask, useUpdateTask } from "@/hooks/useTasks"
 import type { Course, Task, TaskCreate } from "@/types"
 import { useToolsStore } from "@/stores/toolsStore"
 import { toast } from "sonner"
@@ -79,6 +79,15 @@ export default function TasksPage() {
     deadline: "",
     points: 5,
   })
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editForm, setEditForm] = useState<NewTaskForm>({
+    title: "",
+    type: "assignment",
+    subjectMode: "",
+    customSubject: "",
+    deadline: "",
+    points: 5,
+  })
 
   const effectiveStatus = view === "kanban" ? "" : filters.status
   const tasksQuery = useTasks({ type: filters.type, status: effectiveStatus })
@@ -91,6 +100,7 @@ export default function TasksPage() {
   const completeTask = useCompleteTask()
   const uncompleteTask = useUncompleteTask()
   const deleteTask = useDeleteTask()
+  const updateTask = useUpdateTask()
 
   const filteredTasks = useMemo(() => {
     const base = tasksQuery.data ?? []
@@ -138,6 +148,63 @@ export default function TasksPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete task"
       toast.error(message)
+    }
+  }
+
+  const openEditModal = (task: Task) => {
+    setEditingTask(task)
+    setEditForm({
+      title: task.title,
+      type: task.type,
+      subjectMode: task.course_id
+        ? String(task.course_id)
+        : task.subject
+          ? "other"
+          : "",
+      customSubject: task.subject && !task.course_id ? task.subject : "",
+      deadline: task.deadline ? task.deadline.slice(0, 10) : "",
+      points: task.points,
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!editingTask) return
+    if (!editForm.title.trim()) {
+      toast.error("Title is required")
+      return
+    }
+
+    let subject: string | undefined | null
+    let courseIdNum: number | null = null
+
+    if (editForm.subjectMode === "" || editForm.subjectMode === "none") {
+      subject = null
+    } else if (editForm.subjectMode === "other") {
+      subject = editForm.customSubject.trim() || null
+    } else {
+      const course = (coursesQuery.data ?? []).find((item) => String(item.id) === editForm.subjectMode)
+      if (course) {
+        subject = course.name
+        courseIdNum = course.id
+      }
+    }
+
+    try {
+      await updateTask.mutateAsync({
+        id: editingTask.id,
+        data: {
+          title: editForm.title.trim(),
+          type: editForm.type,
+          subject: subject ?? null,
+          deadline: editForm.deadline || null,
+          points: editForm.points,
+          course_id: courseIdNum,
+        },
+      })
+      toast.success("Task updated")
+      setEditingTask(null)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update task")
     }
   }
 
@@ -336,6 +403,7 @@ export default function TasksPage() {
                       task={task}
                       onComplete={(id) => void handleComplete(id, task.status)}
                       onDelete={handleDelete}
+                      onEdit={openEditModal}
                       onFocus={handleFocus}
                     />
                   ))}
@@ -350,6 +418,7 @@ export default function TasksPage() {
                             task={task}
                             onComplete={(id) => void handleComplete(id, task.status)}
                             onDelete={handleDelete}
+                            onEdit={openEditModal}
                           />
                         </div>
                       ))}
@@ -410,6 +479,7 @@ export default function TasksPage() {
                         task={task}
                         onComplete={(id) => void handleComplete(id, task.status)}
                         onDelete={handleDelete}
+                        onEdit={openEditModal}
                         compact
                       />
                     ))}
@@ -512,6 +582,103 @@ export default function TasksPage() {
               className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600"
             >
               Add Task
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingTask !== null} onOpenChange={(open) => !open && setEditingTask(null)}>
+        <DialogContent className="bg-s1 border-b1 rounded-[12px]">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] text-tx3">Title *</label>
+              <input
+                value={editForm.title}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-tx3">Type *</label>
+                <select
+                  value={editForm.type}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, type: e.target.value as NewTaskForm["type"] }))
+                  }
+                  className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+                >
+                  <option value="assignment">Assignment</option>
+                  <option value="study">Study</option>
+                  <option value="productivity">Productivity</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] text-tx3">Points</label>
+                <input
+                  value={String(editForm.points)}
+                  type="number"
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, points: Number(e.target.value || 5) }))}
+                  className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-tx3">Subject / Course</label>
+                <select
+                  value={editForm.subjectMode}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, subjectMode: e.target.value, customSubject: "" }))
+                  }
+                  className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+                >
+                  <option value="">None</option>
+                  {(coursesQuery.data ?? []).map((course) => (
+                    <option key={course.id} value={String(course.id)}>
+                      {course.name} {course.code ? `(${course.code})` : ""}
+                    </option>
+                  ))}
+                  <option value="other">Other (type manually)</option>
+                </select>
+                {editForm.subjectMode === "other" ? (
+                  <input
+                    value={editForm.customSubject}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, customSubject: e.target.value }))}
+                    placeholder="Enter subject name"
+                    className="mt-2 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+                  />
+                ) : null}
+              </div>
+              <div>
+                <label className="text-[11px] text-tx3">Deadline</label>
+                <input
+                  value={editForm.deadline}
+                  type="date"
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, deadline: e.target.value }))}
+                  className="mt-1 h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setEditingTask(null)}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveEdit()}
+              disabled={updateTask.isPending}
+              className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
+            >
+              {updateTask.isPending ? "Saving…" : "Save Changes"}
             </button>
           </DialogFooter>
         </DialogContent>
