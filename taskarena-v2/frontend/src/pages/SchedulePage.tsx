@@ -8,13 +8,13 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns"
-import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Pencil, Plus, Sparkles, Trash2 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import EmptyState from "@/components/shared/EmptyState"
 import { api } from "@/api/client"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { useAcceptSuggestion, useCreateEvent, useDeleteEvent, useMonthEvents, useSuggestions } from "@/hooks/useSchedule"
+import { useAcceptSuggestion, useCreateEvent, useDeleteEvent, useMonthEvents, useSuggestions, useUpdateEvent } from "@/hooks/useSchedule"
 import { cn } from "@/lib/utils"
 import type { Course, ScheduleEvent } from "@/types"
 import { toast } from "sonner"
@@ -51,6 +51,16 @@ export default function SchedulePage() {
     notes: "",
     course_id: "",
   })
+  const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null)
+  const [editForm, setEditForm] = useState<EventForm>({
+    title: "",
+    type: "study",
+    date: "",
+    start_time: "",
+    duration: 60,
+    notes: "",
+    course_id: "",
+  })
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([])
 
   const year = cursorDate.getFullYear()
@@ -62,6 +72,7 @@ export default function SchedulePage() {
   })
   const createEvent = useCreateEvent()
   const deleteEvent = useDeleteEvent()
+  const updateEvent = useUpdateEvent()
   const suggestionsQuery = useSuggestions(provider)
   const acceptSuggestion = useAcceptSuggestion()
 
@@ -130,6 +141,74 @@ export default function SchedulePage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to delete event"
       toast.error(message)
+    }
+  }
+
+  const openEditEvent = (event: ScheduleEvent) => {
+    setEditingEvent(event)
+    setEditForm({
+      title: event.title,
+      type: event.type,
+      date: event.date ? event.date.slice(0, 10) : "",
+      start_time: event.start_time ? event.start_time.slice(0, 5) : "",
+      duration: event.duration ?? 60,
+      notes: event.notes ?? "",
+      course_id: event.course_id ? String(event.course_id) : "",
+    })
+  }
+
+  const saveEditEvent = async () => {
+    if (!editingEvent) return
+    if (!editForm.title.trim()) {
+      toast.error("Title is required")
+      return
+    }
+    const normalizedDate = editForm.date.includes("T") ? editForm.date.split("T")[0] : editForm.date
+    if (!normalizedDate) {
+      toast.error("Date is required")
+      return
+    }
+    try {
+      const trimmedNotes = editForm.notes.trim()
+      const normalizedDuration = editForm.duration > 0 ? editForm.duration : null
+      const normalizedStartTime =
+        editForm.start_time && editForm.start_time.length === 5
+          ? `${editForm.start_time}:00`
+          : editForm.start_time || null
+      const normalizedNotes = trimmedNotes || null
+      const normalizedCourseId = editForm.course_id ? Number(editForm.course_id) : null
+      const payload: {
+        title?: string
+        type?: EventForm["type"]
+        date?: string
+        start_time?: string | null
+        duration?: number | null
+        notes?: string | null
+        course_id?: number | null
+      } = {}
+
+      if (editForm.title.trim() !== editingEvent.title) payload.title = editForm.title.trim()
+      if (editForm.type !== editingEvent.type) payload.type = editForm.type
+      if (normalizedDate !== editingEvent.date) payload.date = normalizedDate
+      if (normalizedStartTime !== (editingEvent.start_time ?? null)) payload.start_time = normalizedStartTime
+      if (normalizedDuration !== (editingEvent.duration ?? null)) payload.duration = normalizedDuration
+      if (normalizedNotes !== (editingEvent.notes ?? null)) payload.notes = normalizedNotes
+      if (normalizedCourseId !== (editingEvent.course_id ?? null)) payload.course_id = normalizedCourseId
+
+      if (Object.keys(payload).length === 0) {
+        toast.message("No changes to save")
+        setEditingEvent(null)
+        return
+      }
+
+      await updateEvent.mutateAsync({
+        id: editingEvent.id,
+        data: payload,
+      })
+      toast.success("Event updated")
+      setEditingEvent(null)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update event")
     }
   }
 
@@ -212,6 +291,14 @@ export default function SchedulePage() {
                         {event.start_time ?? "--:--"} · {event.duration ? `${event.duration}m` : "no duration"}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => openEditEvent(event)}
+                      className="h-7 px-2 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3 transition-colors"
+                      title="Edit event"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => void handleDeleteEvent(event.id)}
@@ -375,6 +462,91 @@ export default function SchedulePage() {
           <DialogFooter>
             <button type="button" onClick={() => setAddModalOpen(false)} className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3">Cancel</button>
             <button type="button" onClick={() => void addEvent()} className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600">Add Event</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingEvent !== null} onOpenChange={(open) => !open && setEditingEvent(null)}>
+        <DialogContent className="bg-s1 border-b1 rounded-[12px]">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <input
+              value={editForm.title}
+              onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+              placeholder="Event title *"
+              className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={editForm.type}
+                onChange={(e) => setEditForm((p) => ({ ...p, type: e.target.value as EventForm["type"] }))}
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+              >
+                <option value="study">Study</option>
+                <option value="assignment">Assignment</option>
+                <option value="exam">Exam</option>
+                <option value="break">Break</option>
+                <option value="other">Other</option>
+              </select>
+              <input
+                value={editForm.date}
+                type="date"
+                onChange={(e) => setEditForm((p) => ({ ...p, date: e.target.value }))}
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={editForm.start_time}
+                type="time"
+                onChange={(e) => setEditForm((p) => ({ ...p, start_time: e.target.value }))}
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+              />
+              <input
+                value={String(editForm.duration)}
+                type="number"
+                onChange={(e) => setEditForm((p) => ({ ...p, duration: Number(e.target.value || 0) }))}
+                placeholder="Duration (min)"
+                className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+              />
+            </div>
+            <select
+              value={editForm.course_id}
+              onChange={(e) => setEditForm((p) => ({ ...p, course_id: e.target.value }))}
+              className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+            >
+              <option value="">No linked course</option>
+              {(coursesQuery.data ?? []).map((course) => (
+                <option key={course.id} value={String(course.id)}>
+                  {course.name}
+                </option>
+              ))}
+            </select>
+            <textarea
+              value={editForm.notes}
+              onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+              placeholder="Notes"
+              className="min-h-[80px] w-full rounded-[7px] border border-b1 bg-s2 px-3 py-2 text-[12px] text-tx outline-none resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setEditingEvent(null)}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveEditEvent()}
+              disabled={updateEvent.isPending}
+              className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
+            >
+              {updateEvent.isPending ? "Saving…" : "Save Changes"}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

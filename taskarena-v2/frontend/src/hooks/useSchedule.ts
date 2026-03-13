@@ -78,3 +78,22 @@ export function useDeleteEvent() {
     },
   })
 }
+
+interface UpdateEventInput {
+  title?: string
+  type?: "study" | "assignment" | "exam" | "break" | "other"
+  date?: string
+  start_time?: string | null
+  duration?: number | null
+  notes?: string | null
+  course_id?: number | null
+}
+
+export function useUpdateEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateEventInput }) =>
+      api.patch<ScheduleEvent>(`/schedule/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
+  })
+}

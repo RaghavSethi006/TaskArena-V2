@@ -95,7 +95,19 @@ export async function apiFetch<T>(
 
       if (!res.ok) {
         const error = await res.json().catch(() => ({ detail: "Unknown error" }))
-        throw new Error(error.detail ?? `HTTP ${res.status}`)
+        const detail = error?.detail
+        if (Array.isArray(detail)) {
+          const message = detail
+            .map((item) => {
+              if (!item) return "Validation error"
+              const loc = Array.isArray(item.loc) ? item.loc.filter(Boolean).join(".") : ""
+              const msg = item.msg ?? "Validation error"
+              return loc ? `${loc}: ${msg}` : msg
+            })
+            .join("; ")
+          throw new Error(message || `HTTP ${res.status}`)
+        }
+        throw new Error(detail ?? `HTTP ${res.status}`)
       }
 
       if (res.status === 204) {

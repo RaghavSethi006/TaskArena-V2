@@ -74,6 +74,29 @@ class ScheduleService:
         event = self.get_event(event_id)
         updates = data.model_dump(exclude_none=True)
 
+        if "date" in updates:
+            raw_date = updates["date"]
+            if isinstance(raw_date, str) and raw_date.strip():
+                try:
+                    updates["date"] = datetime.strptime(raw_date.split("T")[0], "%Y-%m-%d").date()
+                except ValueError as exc:
+                    raise ValueError("Date must be in YYYY-MM-DD format.") from exc
+            elif raw_date is None or (isinstance(raw_date, str) and raw_date.strip() == ""):
+                updates.pop("date", None)
+
+        if "start_time" in updates:
+            raw_time = updates["start_time"]
+            if raw_time is None or (isinstance(raw_time, str) and raw_time.strip() == ""):
+                updates["start_time"] = None
+            elif isinstance(raw_time, str):
+                try:
+                    updates["start_time"] = datetime.strptime(raw_time, "%H:%M:%S").time()
+                except ValueError:
+                    try:
+                        updates["start_time"] = datetime.strptime(raw_time, "%H:%M").time()
+                    except ValueError as exc:
+                        raise ValueError("Start time must be HH:MM or HH:MM:SS.") from exc
+
         if "duration" in updates and updates["duration"] is not None and updates["duration"] <= 0:
             raise ValueError("Duration must be greater than 0.")
 
