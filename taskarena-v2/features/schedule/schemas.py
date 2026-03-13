@@ -17,8 +17,8 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     title: Optional[str] = None
     type: Optional[Literal["study", "assignment", "exam", "break", "other"]] = None
-    date: Optional[date] = None
-    start_time: Optional[time] = None
+    date: Optional[str] = None
+    start_time: Optional[str] = None
     duration: Optional[int] = None
     notes: Optional[str] = None
     course_id: Optional[int] = None
