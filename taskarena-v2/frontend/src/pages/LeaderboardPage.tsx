@@ -518,7 +518,7 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
                     onClick={(e) => {
                       e.stopPropagation()
                       void navigator.clipboard.writeText(lobby.code)
-                      toast.success(Code  copied!)
+                      toast.success(`Code ${lobby.code} copied!`)
                     }}
                     className="px-2 py-2 text-tx3 hover:text-tx2 flex-shrink-0"
                   >
