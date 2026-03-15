@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import { Toaster } from "sonner"
 import AppShell from "./components/layout/AppShell"
+import CommandPalette from "./components/layout/CommandPalette"
 import ChatbotPage from "./pages/ChatbotPage"
 import DashboardPage from "./pages/DashboardPage"
 import LeaderboardPage from "./pages/LeaderboardPage"
@@ -40,6 +41,24 @@ function GlobalTimerEffect() {
 }
 
 export default function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    const keyHandler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setPaletteOpen(true)
+      }
+    }
+    const clickHandler = () => setPaletteOpen(true)
+    window.addEventListener("keydown", keyHandler)
+    window.addEventListener("open-command-palette", clickHandler)
+    return () => {
+      window.removeEventListener("keydown", keyHandler)
+      window.removeEventListener("open-command-palette", clickHandler)
+    }
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
@@ -59,6 +78,7 @@ export default function App() {
           </Routes>
         </AppShell>
         <Toaster position="bottom-right" theme="dark" richColors />
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       </BrowserRouter>
     </QueryClientProvider>
   )

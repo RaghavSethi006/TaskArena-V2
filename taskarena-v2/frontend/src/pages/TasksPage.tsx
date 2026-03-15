@@ -2,6 +2,7 @@ import { addDays, isToday, isWithinInterval, parseISO, startOfDay } from "date-f
 import { Filter, LayoutGrid, List, Plus } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import ConfirmDialog from "@/components/shared/ConfirmDialog"
 import EmptyState from "@/components/shared/EmptyState"
 import LoadingSkeleton from "@/components/shared/LoadingSkeleton"
 import PageHeader from "@/components/shared/PageHeader"
@@ -88,6 +89,12 @@ export default function TasksPage() {
     deadline: "",
     points: 5,
   })
+  const [confirm, setConfirm] = useState<{
+    title: string
+    description: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   const effectiveStatus = view === "kanban" ? "" : filters.status
   const tasksQuery = useTasks({ type: filters.type, status: effectiveStatus })
@@ -141,14 +148,21 @@ export default function TasksPage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Delete this task? This cannot be undone.")) return
-    try {
-      await deleteTask.mutateAsync(id)
-      toast.success("Task deleted")
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete task"
-      toast.error(message)
-    }
+    setConfirm({
+      title: "Delete Task",
+      description: "This task will be permanently deleted.",
+      confirmLabel: "Delete",
+      onConfirm: async () => {
+        setConfirm(null)
+        try {
+          await deleteTask.mutateAsync(id)
+          toast.success("Task deleted")
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to delete task"
+          toast.error(message)
+        }
+      },
+    })
   }
 
   const openEditModal = (task: Task) => {
@@ -678,11 +692,20 @@ export default function TasksPage() {
               disabled={updateTask.isPending}
               className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
             >
-              {updateTask.isPending ? "Saving…" : "Save Changes"}
+              {updateTask.isPending ? "Savingâ€¦" : "Save Changes"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ""}
+        description={confirm?.description ?? ""}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        onConfirm={() => confirm?.onConfirm()}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   )
 }

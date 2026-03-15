@@ -1,26 +1,26 @@
 import { useEffect, useMemo, useState } from "react"
 import PageHeader from "@/components/shared/PageHeader"
 import { useAIConfig, useProfile, useUpdateAIConfig, useUpdateProfile } from "@/hooks/useProfile"
+import { getLevel, getNextThreshold, getPrevThreshold } from "@/lib/xp"
+import { api } from "@/api/client"
+import { useUIStore } from "@/stores/uiStore"
+import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-
-const THRESHOLDS = [0, 100, 250, 500, 850, 1300, 1900, 2700, 3700, 5000]
-
-function getLevel(xp: number) {
-  for (let i = THRESHOLDS.length - 1; i >= 0; i -= 1) {
-    if (xp >= THRESHOLDS[i]) return i + 1
-  }
-  return 1
-}
-
-function nextThreshold(level: number) {
-  return level <= 9 ? THRESHOLDS[level] : THRESHOLDS[9] + (level - 9) * 700
-}
 
 export default function ProfilePage() {
   const profileQuery = useProfile()
   const aiConfigQuery = useAIConfig()
   const updateProfile = useUpdateProfile()
   const updateAI = useUpdateAIConfig()
+  const { preferences, setPreference } = useUIStore()
+
+  const meQuery = useQuery({
+    queryKey: ["leaderboard", "me"],
+    queryFn: () => api.get<{
+      streak: number; tasks_completed: number; quizzes_taken: number; avg_quiz_score: number | null
+    }>("/leaderboard/me"),
+  })
+  const me = meQuery.data
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -44,8 +44,8 @@ export default function ProfilePage() {
 
   const xp = profileQuery.data?.xp ?? 0
   const level = useMemo(() => getLevel(xp), [xp])
-  const maxXp = useMemo(() => nextThreshold(level), [level])
-  const minXp = useMemo(() => THRESHOLDS[Math.max(0, level - 1)] ?? 0, [level])
+  const maxXp = useMemo(() => getNextThreshold(level), [level])
+  const minXp = useMemo(() => getPrevThreshold(level), [level])
   const progress = ((xp - minXp) / Math.max(1, maxXp - minXp)) * 100
 
   return (
@@ -67,13 +67,43 @@ export default function ProfilePage() {
             <p className="mt-1 text-[10px] text-tx3 font-mono">{xp} / {maxXp} XP</p>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-1">
-            {["FOCUS", "STREAK", "QUIZ"].map((badge) => (
-              <div key={badge} className="h-8 rounded-[7px] border border-b1 bg-s2/40 text-[9px] text-tx3 font-mono flex items-center justify-center">
-                {badge}
+          {(() => {
+            const badges: Array<{ label: string; earned: boolean; desc: string }> = [
+              {
+                label: "🔥 Streak",
+                earned: (me?.streak ?? 0) >= 3,
+                desc: me?.streak ?? 0 >= 3 ? `${me?.streak}d streak` : "Reach 3-day streak",
+              },
+              {
+                label: "✅ Taskmaster",
+                earned: (me?.tasks_completed ?? 0) >= 10,
+                desc: me?.tasks_completed ?? 0 >= 10 ? `${me?.tasks_completed} done` : "Complete 10 tasks",
+              },
+              {
+                label: "🧠 Scholar",
+                earned: (me?.quizzes_taken ?? 0) >= 5,
+                desc: me?.quizzes_taken ?? 0 >= 5 ? `${me?.quizzes_taken} quizzes` : "Take 5 quizzes",
+              },
+            ]
+
+            return (
+              <div className="mt-4 space-y-1.5">
+                {badges.map((badge) => (
+                  <div
+                    key={badge.label}
+                    className={`rounded-[7px] border px-2.5 py-1.5 flex items-center justify-between ${
+                      badge.earned
+                        ? "border-amber-500/25 bg-amber-500/10"
+                        : "border-b1 bg-s2/30 opacity-40"
+                    }`}
+                  >
+                    <span className="text-[11px] font-medium text-tx">{badge.label}</span>
+                    <span className="text-[10px] text-tx3 font-mono">{badge.desc}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )
+          })()}
         </aside>
 
         <section className="space-y-3">
@@ -131,11 +161,33 @@ export default function ProfilePage() {
           </div>
 
           <div className="rounded-[10px] border border-b1 bg-s1 p-4">
-            <h3 className="text-[13px] font-semibold mb-2">Preferences</h3>
-            <div className="space-y-2 text-[12px] text-tx2">
-              <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> Notifications</label>
-              <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> Sound effects</label>
-              <label className="flex items-center gap-2"><input type="checkbox" /> Auto-index files</label>
+            <h3 className="text-[13px] font-semibold mb-3">Preferences</h3>
+            <div className="space-y-3">
+              {([
+                { key: "notifications" as const, label: "Notifications", desc: "Desktop alerts for deadlines" },
+                { key: "soundEffects" as const, label: "Sound Effects", desc: "Audio feedback on actions" },
+                { key: "autoIndexFiles" as const, label: "Auto-index Files", desc: "Index new files automatically on upload" },
+              ]).map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[12px] text-tx font-medium">{label}</p>
+                    <p className="text-[10px] text-tx3">{desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreference(key, !preferences[key])}
+                    className={`w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
+                      preferences[key] ? "bg-blue-500" : "bg-s3 border border-b1"
+                    }`}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white shadow transition-transform mx-1 ${
+                        preferences[key] ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </section>

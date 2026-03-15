@@ -22,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useProfile } from "@/hooks/useProfile"
 import { cn } from "@/lib/utils"
 import type { ToolId } from "@/stores/toolsStore"
 import { useToolsStore } from "@/stores/toolsStore"
@@ -97,6 +98,8 @@ export default function Topbar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { toggleSidebar } = useUIStore()
+  const profileQuery = useProfile()
+  const initials = (profileQuery.data?.name ?? "??").slice(0, 2).toUpperCase()
 
   const title = useMemo(() => {
     if (location.pathname.startsWith("/chat")) return "AI Tutor"
@@ -118,13 +121,13 @@ export default function Topbar() {
       </div>
 
       <div className="flex-1 flex justify-center">
-        <div className="hidden md:flex items-center gap-2 bg-s2 border border-b1 rounded-[7px] px-3 py-1.5 w-[200px] hover:w-[280px] focus-within:w-[280px] transition-all duration-200 cursor-text">
+        <div
+          onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+          className="hidden md:flex items-center gap-2 bg-s2 border border-b1 rounded-[7px] px-3 py-1.5 w-[200px] cursor-pointer hover:border-b2 hover:bg-s3 transition-all duration-200"
+        >
           <Search className="w-3 h-3 text-tx3 flex-shrink-0" />
-          <input
-            placeholder="Search..."
-            className="bg-transparent text-[12.5px] text-tx placeholder:text-tx3 outline-none w-full"
-          />
-          <span className="text-[10px] text-tx3 font-mono flex-shrink-0">?K</span>
+          <span className="text-[12.5px] text-tx3 flex-1 select-none">Search…</span>
+          <span className="text-[10px] text-tx3 font-mono flex-shrink-0 bg-s1 border border-b1 px-1 rounded">⌘K</span>
         </div>
       </div>
 
@@ -136,18 +139,27 @@ export default function Topbar() {
         </div>
       </TooltipProvider>
 
-      <button
-        className="w-[30px] h-[30px] rounded-[6px] border border-b1 flex items-center justify-center text-tx3 hover:bg-s2 transition-colors"
-        type="button"
-      >
-        <Bell className="w-[14px] h-[14px]" />
-      </button>
+      <TooltipProvider delayDuration={80}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="w-[30px] h-[30px] rounded-[6px] border border-b1 flex items-center justify-center text-tx3 hover:bg-s2 transition-colors opacity-40 cursor-not-allowed"
+              type="button"
+            >
+              <Bell className="w-[14px] h-[14px]" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-[11px]">
+            Notifications coming soon
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 px-2 py-1 rounded-[7px] hover:bg-s2 transition-colors" type="button">
             <div className="w-6 h-6 rounded-[5px] bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-              <span className="text-[9px] font-bold text-white font-mono">RS</span>
+              <span className="text-[9px] font-bold text-white font-mono">{initials}</span>
             </div>
             <ChevronDown className="w-3 h-3 text-tx3" />
           </button>

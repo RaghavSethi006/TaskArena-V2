@@ -1,6 +1,7 @@
-﻿import { BookOpen, Brain, ChevronDown, ChevronUp, FileText, FlaskConical, Plus, ScrollText, Trash2 } from "lucide-react"
+import { BookOpen, Brain, ChevronDown, ChevronUp, FileText, FlaskConical, Plus, ScrollText, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { getBaseApiUrl } from "@/api/client"
+import ConfirmDialog from "@/components/shared/ConfirmDialog"
 import EmptyState from "@/components/shared/EmptyState"
 import LoadingSkeleton from "@/components/shared/LoadingSkeleton"
 import PageHeader from "@/components/shared/PageHeader"
@@ -71,7 +72,7 @@ function StudyNotesViewer({ material }: { material: StudyMaterial }) {
             <ul className="px-4 pb-3 space-y-1">
               {(section.bullets ?? []).map((bullet, bi) => (
                 <li key={bi} className="flex items-start gap-2 text-[12px] text-tx2">
-                  <span className="text-blue-400 mt-1 flex-shrink-0">•</span>
+                  <span className="text-blue-400 mt-1 flex-shrink-0">â€¢</span>
                   {bullet}
                 </li>
               ))}
@@ -146,7 +147,7 @@ function QAViewer({ material }: { material: StudyMaterial }) {
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {item.hints.map((hint, hi) => (
                   <span key={hi} className="text-[10px] px-2 py-0.5 rounded-[5px] bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                    💡 {hint}
+                    ðŸ’¡ {hint}
                   </span>
                 ))}
               </div>
@@ -171,7 +172,7 @@ function QAViewer({ material }: { material: StudyMaterial }) {
                     onClick={() => setShowLong((prev) => new Set([...prev, idx]))}
                     className="h-7 px-3 rounded-[7px] border border-b1 bg-s1 text-[11px] text-blue-300 hover:bg-s2"
                   >
-                    Show Detailed Answer ▼
+                    Show Detailed Answer â–¼
                   </button>
                 ) : (
                   <div className="rounded-[7px] bg-s1 border border-blue-500/20 px-3 py-2">
@@ -286,7 +287,7 @@ function MaterialCard({
           <div className="flex-1 min-w-0">
             <h3 className="text-[13px] font-semibold text-tx truncate">{material.title}</h3>
             <p className="text-[10px] text-tx3 font-mono mt-0.5">
-              {itemCount} {countLabel} · {new Date(material.created_at).toLocaleDateString()}
+              {itemCount} {countLabel} Â· {new Date(material.created_at).toLocaleDateString()}
             </p>
           </div>
           <button
@@ -331,6 +332,12 @@ export default function StudyHubPage() {
     results: Array<{ question_id: number; correct: boolean; chosen: string; answer: string; explanation: string }>
   } | null>(null)
   const [viewingMaterial, setViewingMaterial] = useState<StudyMaterial | null>(null)
+  const [confirm, setConfirm] = useState<{
+    title: string
+    description: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   const coursesQuery = useStudyHubCourses()
   const quizzesQuery = useQuizzes(selectedCourse?.id ?? null)
@@ -453,7 +460,7 @@ export default function StudyHubPage() {
             onClick={() => setViewingMaterial(null)}
             className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3"
           >
-            ← Back to Hub
+            â† Back to Hub
           </button>
         </div>
         {viewingMaterial.type === "study_notes"   && <StudyNotesViewer   material={viewingMaterial} />}
@@ -504,7 +511,7 @@ export default function StudyHubPage() {
                     <p className="text-[9px] text-tx3 uppercase tracking-wide mt-0.5">Sheets</p>
                   </div>
                 </div>
-                <p className="mt-3 text-[10px] text-tx3 font-mono">Tap to browse materials →</p>
+                <p className="mt-3 text-[10px] text-tx3 font-mono">Tap to browse materials â†’</p>
               </div>
             </button>
           ))}
@@ -630,7 +637,7 @@ export default function StudyHubPage() {
                               : "bg-rose-500/15 text-rose-400"
                           }`}
                         >
-                          {r.correct ? "âœ“ Correct" : "âœ— Wrong"}
+                          {r.correct ? "Ã¢Å“â€œ Correct" : "Ã¢Å“â€” Wrong"}
                         </span>
                         <p className="text-[13px] text-tx leading-snug">
                           Q{idx + 1}. {q.question}
@@ -640,7 +647,7 @@ export default function StudyHubPage() {
                       <div className="flex flex-wrap gap-2 mb-3">
                         {!r.correct ? (
                           <span className="text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                            You chose: {chosenLetter}. {q[`option_${r.chosen}` as keyof typeof q] as string || "â€”"}
+                            You chose: {chosenLetter}. {q[`option_${r.chosen}` as keyof typeof q] as string || "Ã¢â‚¬â€"}
                           </span>
                         ) : null}
                         <span className="text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
@@ -899,10 +906,17 @@ export default function StudyHubPage() {
                     key={material.id}
                     material={material}
                     onView={() => setViewingMaterial(material)}
-                    onDelete={async () => {
-                      if (!window.confirm("Delete this material?")) return
-                      await deleteStudyMaterial.mutateAsync(material.id)
-                      toast.success("Deleted")
+                    onDelete={() => {
+                      setConfirm({
+                        title: "Delete Material",
+                        description: "This generated material will be permanently deleted.",
+                        confirmLabel: "Delete",
+                        onConfirm: async () => {
+                          setConfirm(null)
+                          await deleteStudyMaterial.mutateAsync(material.id)
+                          toast.success("Deleted")
+                        },
+                      })
                     }}
                   />
                 ))}
@@ -961,7 +975,7 @@ export default function StudyHubPage() {
               </select>
             )}
 
-            {/* Provider — always shown */}
+            {/* Provider â€” always shown */}
             <div>
               <p className="text-[11px] text-tx3 font-mono uppercase tracking-wide mb-1.5">AI Provider</p>
               <select
@@ -975,7 +989,7 @@ export default function StudyHubPage() {
               </select>
             </div>
 
-            {/* Difficulty — only for quiz, Q&A, practice exam */}
+            {/* Difficulty â€” only for quiz, Q&A, practice exam */}
             {(activeTab === "quizzes" || activeTab === "qa" || activeTab === "practice_exam") && (
               <div>
                 <p className="text-[11px] text-tx3 font-mono uppercase tracking-wide mb-1.5">Difficulty</p>
@@ -1002,7 +1016,7 @@ export default function StudyHubPage() {
               </div>
             )}
 
-            {/* Count — label and range varies per type */}
+            {/* Count â€” label and range varies per type */}
             <div>
               <p className="text-[11px] text-tx3 font-mono uppercase tracking-wide mb-1.5">
                 {activeTab === "quizzes" ? "Number of Questions"
@@ -1035,12 +1049,12 @@ export default function StudyHubPage() {
                 {activeTab === "quizzes"
                   ? "Multiple-choice questions graded automatically."
                   : activeTab === "study_notes"
-                    ? "Each section contains 3–6 key bullet points. No difficulty level — notes aim for comprehensive coverage."
+                    ? "Each section contains 3â€“6 key bullet points. No difficulty level â€” notes aim for comprehensive coverage."
                     : activeTab === "formula_sheet"
-                      ? "Each entry includes the formula, explanation, variables, and a worked example. No difficulty level — formulas are objective."
+                      ? "Each entry includes the formula, explanation, variables, and a worked example. No difficulty level â€” formulas are objective."
                       : activeTab === "qa"
                         ? "Open-ended questions with a short answer and a detailed model answer."
-                        : "Questions spread across 2–3 sections with marks and model answers."}
+                        : "Questions spread across 2â€“3 sections with marks and model answers."}
               </p>
             </div>
 
@@ -1111,6 +1125,15 @@ export default function StudyHubPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ""}
+        description={confirm?.description ?? ""}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        onConfirm={() => confirm?.onConfirm()}
+        onCancel={() => setConfirm(null)}
+      />
 
     </div>
   )

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
 import type { Course, Quiz, QuizAttempt, QuizQuestion, StudyMaterial, StudyMaterialType } from "@/types"
 import { toast } from "sonner"
+import { auth } from "@/lib/firebase"
+import { syncStatsToFirebase } from "@/hooks/useLobbies"
 
 interface QuizGenerateRequest {
   title: string
@@ -104,6 +106,31 @@ export function useSubmitAttempt() {
       await qc.invalidateQueries({ queryKey: ["study-hub", "quiz", variables.quizId] })
       await qc.invalidateQueries({ queryKey: ["study-hub", "quiz-attempts", variables.quizId] })
       await qc.invalidateQueries({ queryKey: ["stats"] })
+
+      // Push fresh stats to Firebase if user is signed into lobbies
+      const uid = auth.currentUser?.uid
+      if (uid) {
+        try {
+          const meStats = await qc.fetchQuery<{
+            name: string; xp: number; level: number
+            streak: number; tasks_completed: number; weekly_xp: number
+          }>({
+            queryKey: ["leaderboard", "me"],
+            queryFn: () => api.get("/leaderboard/me"),
+            staleTime: 0,
+          })
+          await syncStatsToFirebase(uid, {
+            name: meStats.name,
+            xp: meStats.xp,
+            level: meStats.level,
+            streak: meStats.streak,
+            tasks_completed: meStats.tasks_completed,
+            weekly_xp: meStats.weekly_xp,
+          })
+        } catch {
+          // Firebase sync is best-effort — never block quiz submission
+        }
+      }
     },
   })
 }

@@ -1,6 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../api/client"
 import type { Task, TaskCreate } from "../types"
+import { auth } from "@/lib/firebase"
+import { syncStatsToFirebase } from "@/hooks/useLobbies"
 
 export interface TaskUpdate {
   title?: string
@@ -58,9 +60,34 @@ export function useCompleteTask() {
     onError: (_err, _id, ctx) => {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data))
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["tasks"] })
-      qc.invalidateQueries({ queryKey: ["stats"] })
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] })
+      await qc.invalidateQueries({ queryKey: ["stats"] })
+
+      // Push fresh stats to Firebase if user is signed into lobbies
+      const uid = auth.currentUser?.uid
+      if (uid) {
+        try {
+          const meStats = await qc.fetchQuery<{
+            name: string; xp: number; level: number
+            streak: number; tasks_completed: number; weekly_xp: number
+          }>({
+            queryKey: ["leaderboard", "me"],
+            queryFn: () => api.get("/leaderboard/me"),
+            staleTime: 0,
+          })
+          await syncStatsToFirebase(uid, {
+            name: meStats.name,
+            xp: meStats.xp,
+            level: meStats.level,
+            streak: meStats.streak,
+            tasks_completed: meStats.tasks_completed,
+            weekly_xp: meStats.weekly_xp,
+          })
+        } catch {
+          // Firebase sync is best-effort — never block task completion
+        }
+      }
     },
   })
 }
