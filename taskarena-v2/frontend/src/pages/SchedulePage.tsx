@@ -1,4 +1,4 @@
-import {
+﻿import {
   addDays,
   endOfMonth,
   endOfWeek,
@@ -11,6 +11,7 @@ import {
 import { ChevronLeft, ChevronRight, Pencil, Plus, Sparkles, Trash2 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import ConfirmDialog from "@/components/shared/ConfirmDialog"
 import EmptyState from "@/components/shared/EmptyState"
 import { api } from "@/api/client"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -35,6 +36,14 @@ function eventBarColor(type: ScheduleEvent["type"]) {
   if (type === "exam") return "bg-rose-400"
   if (type === "break") return "bg-emerald-400"
   return "bg-zinc-400"
+}
+
+const EVENT_TYPE_CONFIG: Record<ScheduleEvent["type"], { color: string; bg: string; label: string }> = {
+  study: { color: "border-l-blue-500", bg: "bg-blue-500/8", label: "Study" },
+  assignment: { color: "border-l-orange-500", bg: "bg-orange-500/8", label: "Assignment" },
+  exam: { color: "border-l-rose-500", bg: "bg-rose-500/8", label: "Exam" },
+  break: { color: "border-l-emerald-500", bg: "bg-emerald-500/8", label: "Break" },
+  other: { color: "border-l-zinc-500", bg: "bg-zinc-500/8", label: "Other" },
 }
 
 export default function SchedulePage() {
@@ -62,6 +71,12 @@ export default function SchedulePage() {
     course_id: "",
   })
   const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([])
+  const [confirm, setConfirm] = useState<{
+    title: string
+    description: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   const year = cursorDate.getFullYear()
   const month = cursorDate.getMonth() + 1
@@ -129,17 +144,6 @@ export default function SchedulePage() {
       setAddModalOpen(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to add event"
-      toast.error(message)
-    }
-  }
-
-  const handleDeleteEvent = async (eventId: number) => {
-    if (!window.confirm("Delete this event?")) return
-    try {
-      await deleteEvent.mutateAsync(eventId)
-      toast.success("Event deleted")
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete event"
       toast.error(message)
     }
   }
@@ -279,41 +283,74 @@ export default function SchedulePage() {
           <div className="mt-3 rounded-[10px] border border-b1 bg-s2/40 p-3">
             <h3 className="text-[13px] font-semibold mb-2">{format(selectedDate, "EEEE, MMM d")}</h3>
             {selectedDayEvents.length === 0 ? (
-              <EmptyState title="No events" description="This day has no scheduled events." />
+              <div className="text-center py-6">
+                <p className="text-[13px] text-tx2">No events on {format(selectedDate, "EEEE, MMM d")}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEventForm((p) => ({ ...p, date: selectedDayKey }))
+                    setAddModalOpen(true)
+                  }}
+                  className="mt-2 h-7 px-3 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600 inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add Event
+                </button>
+              </div>
             ) : (
               <div className="space-y-2">
-                {selectedDayEvents.map((event) => (
-                  <div key={event.id} className="rounded-[7px] border border-b1 bg-s1 p-2 flex items-center gap-2">
-                    <span className={cn("w-2 h-2 rounded-full", eventBarColor(event.type))} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] text-tx truncate">{event.title}</p>
-                      <p className="text-[10px] text-tx3 font-mono">
-                        {event.start_time ?? "--:--"} · {event.duration ? `${event.duration}m` : "no duration"}
-                      </p>
+                {selectedDayEvents.map((event) => {
+                  const cfg = EVENT_TYPE_CONFIG[event.type]
+                  return (
+                    <div
+                      key={event.id}
+                      className={`rounded-[8px] border border-b1 border-l-2 ${cfg.color} ${cfg.bg} px-3 py-2.5`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] text-tx font-medium truncate">{event.title}</p>
+                          <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-tx3">
+                            {event.start_time && <span>🕐 {event.start_time}</span>}
+                            {event.duration && <span>{event.duration}min</span>}
+                            {!event.start_time && !event.duration && <span>{cfg.label}</span>}
+                          </div>
+                          {event.notes && (
+                            <p className="text-[10px] text-tx3 mt-1 truncate">{event.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openEditEvent(event)}
+                            className="h-7 px-2 rounded-[6px] border border-b1 bg-s2/60 text-tx3 hover:text-tx hover:bg-s2 transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirm({
+                              title: "Delete Event",
+                              description: "This event will be removed from your schedule.",
+                              confirmLabel: "Delete",
+                              onConfirm: async () => {
+                                setConfirm(null)
+                                await deleteEvent.mutateAsync(event.id)
+                                toast.success("Event deleted")
+                              },
+                            })}
+                            className="h-7 px-2 rounded-[6px] border border-rose-500/25 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => openEditEvent(event)}
-                      className="h-7 px-2 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3 transition-colors"
-                      title="Edit event"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteEvent(event.id)}
-                      className="w-7 h-7 rounded-[6px] border border-rose-500/25 bg-[var(--rd)] text-rose-300 hover:bg-rose-500/15"
-                      title="Delete event"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 mx-auto" />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
         </div>
-
         <div className="space-y-3">
           <div className="rounded-[10px] border border-b1 bg-s1 p-3">
             <div className="flex items-center justify-between mb-2">
@@ -381,7 +418,7 @@ export default function SchedulePage() {
                       )}
                     </div>
                     <p className="text-[10px] text-tx3 font-mono">
-                      {suggestion.date} · {suggestion.start_time} · {suggestion.duration}min
+                      {suggestion.date} Ã‚Â· {suggestion.start_time} Ã‚Â· {suggestion.duration}min
                     </p>
                     <p className="text-[11px] text-tx2 mt-1">{suggestion.reason ?? "AI-generated suggestion"}</p>
                     <div className="mt-2 flex gap-2">
@@ -422,7 +459,7 @@ export default function SchedulePage() {
                 .slice(0, 6)
                 .map((event) => (
                   <div key={`deadline-${event.id}`} className="rounded-[7px] border border-b1 bg-s2/40 px-2 py-1.5 text-[11px] text-tx2">
-                    {event.title} · <span className="font-mono text-tx3">{event.date}</span>
+                    {event.title} Ã‚Â· <span className="font-mono text-tx3">{event.date}</span>
                   </div>
                 ))}
             </div>
@@ -545,11 +582,25 @@ export default function SchedulePage() {
               disabled={updateEvent.isPending}
               className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
             >
-              {updateEvent.isPending ? "Saving…" : "Save Changes"}
+              {updateEvent.isPending ? "SavingÃ¢â‚¬Â¦" : "Save Changes"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ""}
+        description={confirm?.description ?? ""}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        onConfirm={() => confirm?.onConfirm()}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   )
 }
+
+
+
+
+
