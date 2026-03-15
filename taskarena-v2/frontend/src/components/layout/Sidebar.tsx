@@ -18,6 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useProfile } from "@/hooks/useProfile"
 import { cn } from "@/lib/utils"
 import { useUIStore } from "@/stores/uiStore"
 
@@ -92,6 +93,11 @@ function NavItem({ icon: Icon, label, path, collapsed }: NavItemProps) {
 
 export default function Sidebar() {
   const { sidebarCollapsed: collapsed, toggleSidebar } = useUIStore()
+  const profileQuery = useProfile()
+  const profileName = profileQuery.data?.name ?? "—"
+  const profileXp = profileQuery.data?.xp ?? 0
+  const profileLevel = profileQuery.data?.level ?? 1
+  const initials = profileName.slice(0, 2).toUpperCase()
 
   return (
     <aside
@@ -169,12 +175,12 @@ export default function Sidebar() {
 
           <div className={cn("flex items-center gap-2.5 px-3 py-2.5", collapsed && "justify-center")}>
             <div className="w-7 h-7 rounded-[7px] bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-[10px] font-bold text-white font-mono">RS</span>
+              <span className="text-[10px] font-bold text-white font-mono">{initials}</span>
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <div className="text-[12px] font-semibold text-tx truncate">Raghav Sethi</div>
-                <div className="text-[10px] text-tx3 font-mono">Lv.14 · 2340 XP</div>
+                <div className="text-[12px] font-semibold text-tx truncate">{profileName}</div>
+                <div className="text-[10px] text-tx3 font-mono">Lv.{profileLevel} · {profileXp.toLocaleString()} XP</div>
               </div>
             )}
           </div>

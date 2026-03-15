@@ -1,5 +1,5 @@
 import { Award, CalendarDays, Flame, ListChecks, TrendingUp } from "lucide-react"
-import { format, isToday, parseISO } from "date-fns"
+import { differenceInCalendarDays, format, isToday, parseISO, startOfDay } from "date-fns"
 import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import EmptyState from "@/components/shared/EmptyState"
@@ -8,21 +8,32 @@ import PageHeader from "@/components/shared/PageHeader"
 import StatCard from "@/components/shared/StatCard"
 import TaskCard from "@/components/shared/TaskCard"
 import { Progress } from "@/components/ui/progress"
+import { useProfile } from "@/hooks/useProfile"
 import { useOverviewStats, useLeaderboard, useWeekEvents } from "@/hooks/useStats"
-import { useTasks } from "@/hooks/useTasks"
-
-const NEXT_LEVEL_XP = 5000
+import { useCompleteTask, useDeleteTask, useTasks } from "@/hooks/useTasks"
+import { getLevelProgress } from "@/lib/xp"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const profileQuery = useProfile()
   const statsQuery = useOverviewStats()
   const tasksQuery = useTasks({ status: "pending" })
   const weekEventsQuery = useWeekEvents()
   const leaderboardQuery = useLeaderboard()
+  const completeTask = useCompleteTask()
+  const deleteTask = useDeleteTask()
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
-  const name = "Raghav"
+  const name = profileQuery.data?.name?.split(" ")[0] ?? "there"
+
+  const handleComplete = async (id: number) => {
+    await completeTask.mutateAsync(id)
+  }
+
+  const handleDelete = async (id: number) => {
+    await deleteTask.mutateAsync(id)
+  }
 
   const dueToday = useMemo(
     () => (tasksQuery.data ?? []).filter((task) => task.deadline && isToday(parseISO(task.deadline))).slice(0, 4),
@@ -53,8 +64,7 @@ export default function DashboardPage() {
   }
 
   const stats = statsQuery.data
-  const xpProgress = Math.min(100, (stats.total_xp / NEXT_LEVEL_XP) * 100)
-  const xpToNext = Math.max(0, NEXT_LEVEL_XP - stats.total_xp)
+  const { level, progress: xpProgress, xpToNext } = getLevelProgress(stats.total_xp)
 
   return (
     <div className="animate-fadeUp">
@@ -95,7 +105,12 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 {dueToday.map((task) => (
                   <div key={task.id} onClick={() => navigate("/tasks")} className="cursor-pointer">
-                    <TaskCard task={task} onComplete={() => {}} onDelete={() => {}} compact />
+                    <TaskCard
+                      task={task}
+                      onComplete={(id) => void handleComplete(id)}
+                      onDelete={(id) => void handleDelete(id)}
+                      compact
+                    />
                   </div>
                 ))}
               </div>
@@ -127,7 +142,7 @@ export default function DashboardPage() {
         <div className="space-y-3">
           <div className="rounded-[10px] border border-b1 bg-s1 p-4">
             <h2 className="text-[15px] font-semibold mb-2">XP Progress</h2>
-            <p className="text-[12px] text-tx2 mb-2">Level {stats.level}</p>
+            <p className="text-[12px] text-tx2 mb-2">Level {level}</p>
             <Progress value={xpProgress} className="h-2 bg-s2 border border-b1" />
             <p className="mt-2 text-[11px] text-tx3 font-mono">{xpToNext} XP to next level</p>
           </div>
@@ -147,10 +162,48 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[10px] border border-b1 bg-s1 p-4">
-            <h2 className="text-[15px] font-semibold mb-1">Daily Digest</h2>
-            <p className="text-[12px] text-tx2">AI digest coming soon.</p>
-          </div>
+          {(() => {
+            const upcoming = (tasksQuery.data ?? [])
+              .filter((t) => t.status === "pending" && t.deadline)
+              .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+              .slice(0, 5)
+
+            return (
+              <div className="rounded-[10px] border border-b1 bg-s1 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-[15px] font-semibold">Upcoming Deadlines</h2>
+                  <Link to="/tasks" className="text-[12px] text-blue-300 hover:text-blue-200">
+                    See all →
+                  </Link>
+                </div>
+                {upcoming.length === 0 ? (
+                  <p className="text-[12px] text-tx3">No upcoming deadlines.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {upcoming.map((task) => {
+                      const days = differenceInCalendarDays(
+                        startOfDay(parseISO(task.deadline!)),
+                        startOfDay(new Date())
+                      )
+                      const urgency = days < 0 ? "text-rose-400" : days === 0 ? "text-amber-400" : "text-tx3"
+                      const label = days < 0 ? "Overdue" : days === 0 ? "Today" : `${days}d`
+                      return (
+                        <div key={task.id} className="flex items-center gap-3 rounded-[7px] border border-b1 bg-s2/40 px-3 py-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] text-tx truncate">{task.title}</p>
+                            <p className="text-[10px] text-tx3 font-mono mt-0.5">{task.subject ?? task.type}</p>
+                          </div>
+                          <span className={`text-[11px] font-bold font-mono flex-shrink-0 ${urgency}`}>
+                            {label}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </section>
     </div>
