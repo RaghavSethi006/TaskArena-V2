@@ -38,7 +38,7 @@ Detailed documentation is available in the `docs/` directory:
 
 ## ⚖️ License
 
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the **PO License v1.0 (POL)**. See the [LICENSE](LICENSE) file for details.
 
 ---
 

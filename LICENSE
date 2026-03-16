@@ -1,21 +1,36 @@
-MIT License
+# PO License v1
 
+This is a Private-Open License (POL) and it is intended to be used on
+private source-code projects that might or not be in public domain.
+
+By using this project you agree that:
+
+1. You CANNOT distribute the source-code or any part of it without
+   the author's permission.
+2. You CANNOT use the source-code or any part of it for commercial
+   purposes without the author's permission.
+3. You CANNOT use the source-code or any part of it for any purpose
+   that is not authorized by the author.
+4. You CANNOT remove this license from the project.
+5. You CANNOT change this license.
+
+6. You CAN use the source-code or any part of it for educational
+   purposes.
+7. You CAN use the source-code or any part of it for personal
+   purposes.
+8. You CAN use the source-code or any part of it for any purpose
+   that is authorized by the author.
+
+9. The author is NOT responsible for any damage caused by the use
+   of this project.
+10. The author is NOT responsible for any legal issues caused by
+    the use of this project.
+
+11. The author HAS THE RIGHT to change this license at any time.
+12. The author HAS THE RIGHT to terminate this license at any time.
+
+13. This license is governed by the laws of the country where the
+    author resides.
+
+---
 Copyright (c) 2026 Raghav Sethi
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
