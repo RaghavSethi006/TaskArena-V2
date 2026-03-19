@@ -91,6 +91,10 @@ def create_app() -> FastAPI:
     def health():
         return {"status": "ok", "version": "2.0.0"}
 
+    @app.get("/api/health", tags=["system"])
+    def api_health():
+        return {"status": "ok", "version": "2.0.0"}
+
     # ── API info ──
     @app.get("/api", tags=["system"])
     def api_info():

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { BookOpen } from "lucide-react"
 import PageHeader from "@/components/shared/PageHeader"
 import { useAIConfig, useProfile, useUpdateAIConfig, useUpdateProfile } from "@/hooks/useProfile"
 import { getLevel, getNextThreshold, getPrevThreshold } from "@/lib/xp"
@@ -189,6 +190,21 @@ export default function ProfilePage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-[10px] border border-b1 bg-s1 p-4">
+            <h3 className="text-[13px] font-semibold mb-1">Help & Onboarding</h3>
+            <p className="text-[11px] text-tx3 mb-3">
+              Replay the setup wizard and feature tour at any time.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("restart-tutorial"))}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-[12px] text-tx2 hover:bg-s3 transition-colors inline-flex items-center gap-1.5"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Restart Tutorial
+            </button>
           </div>
         </section>
       </div>
