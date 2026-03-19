@@ -1,4 +1,6 @@
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
 #[tauri::command]
@@ -83,9 +85,22 @@ pub fn run() {
             if port > 0 {
                 let _ = window.eval(&format!("window.__BACKEND_PORT__ = {}", port));
             }
+            let window = window.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(50));
+                let _ = window.show();
+                let _ = window.set_focus();
+            });
         })
         .setup(|app| {
             start_backend(app);
+            if let Some(window) = app.get_webview_window("main") {
+                thread::spawn(move || {
+                    thread::sleep(Duration::from_millis(200));
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![get_backend_port])
