@@ -3,8 +3,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from sqlalchemy import inspect
-from sqlalchemy.exc import SQLAlchemyError
 
 from backend.middleware import setup_middleware
 from backend.routers import (
@@ -14,12 +12,12 @@ from backend.routers import (
     profile,
     quiz,
     schedule,
+    schedule_template,
     stats,
     study_materials,
     tasks,
 )
 from shared.config import settings
-from shared.database import engine
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -42,21 +40,13 @@ def run_migrations_if_needed() -> None:
         return
 
     try:
-        inspector = inspect(engine)
-        if inspector.has_table("study_materials"):
-            return
-    except SQLAlchemyError as exc:
-        logger.warning("Database inspection failed; skipping migrations", exc_info=exc)
-        return
-
-    try:
         from alembic import command
         from alembic.config import Config
 
         alembic_cfg = Config(str(alembic_ini))
         alembic_cfg.set_main_option("script_location", str(alembic_dir))
         command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations applied")
+        logger.info("Database migrations checked")
     except Exception as exc:
         logger.error("Failed to run migrations", exc_info=exc)
 
@@ -113,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(notes.router, prefix="/api")
     app.include_router(chatbot.router, prefix="/api")
     app.include_router(schedule.router, prefix="/api")
+    app.include_router(schedule_template.router, prefix="/api")
     app.include_router(quiz.router, prefix="/api")
     app.include_router(study_materials.router, prefix="/api")
     app.include_router(leaderboard.router, prefix="/api")
