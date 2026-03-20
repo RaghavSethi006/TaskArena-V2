@@ -44,7 +44,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/taskarena-backend/taskarena-backend"
+      "binaries/taskarena-backend"
     ]
   }
 }
