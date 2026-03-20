@@ -1,4 +1,4 @@
-﻿import {
+import {
   addDays,
   endOfMonth,
   endOfWeek,
@@ -8,17 +8,50 @@
   startOfMonth,
   startOfWeek,
 } from "date-fns"
-import { ChevronLeft, ChevronRight, Pencil, Plus, Sparkles, Trash2 } from "lucide-react"
+import {
+  Calendar,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Layout,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react"
 import { useMemo, useState } from "react"
+import type { Dispatch, SetStateAction } from "react"
 import { useQuery } from "@tanstack/react-query"
 import ConfirmDialog from "@/components/shared/ConfirmDialog"
-import EmptyState from "@/components/shared/EmptyState"
+import AdjustmentBanner from "@/components/schedule/AdjustmentBanner"
+import DailyView from "@/components/schedule/DailyView"
+import WeeklyView from "@/components/schedule/WeeklyView"
+import TemplateTab from "@/components/schedule/TemplateTab"
 import { api } from "@/api/client"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { useAcceptSuggestion, useCreateEvent, useDeleteEvent, useMonthEvents, useSuggestions, useUpdateEvent } from "@/hooks/useSchedule"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  useAcceptSuggestion,
+  useCreateEvent,
+  useDeleteEvent,
+  useMonthEvents,
+  useSchedulePreferences,
+  useSuggestions,
+  useTemplateSlots,
+  useUpdateEvent,
+} from "@/hooks/useSchedule"
 import { cn } from "@/lib/utils"
-import type { Course, ScheduleEvent } from "@/types"
+import type { Course, ScheduleEvent, TemplateSlot } from "@/types"
 import { toast } from "sonner"
+
+type MainTab = "calendar" | "template"
+type CalendarView = "monthly" | "weekly" | "daily"
 
 interface EventForm {
   title: string
@@ -30,6 +63,14 @@ interface EventForm {
   course_id: string
 }
 
+const EVENT_TYPE_CONFIG: Record<ScheduleEvent["type"], { leftBorder: string; bg: string }> = {
+  study: { leftBorder: "border-l-blue-500", bg: "bg-blue-500/8" },
+  assignment: { leftBorder: "border-l-orange-500", bg: "bg-orange-500/8" },
+  exam: { leftBorder: "border-l-rose-500", bg: "bg-rose-500/8" },
+  break: { leftBorder: "border-l-emerald-500", bg: "bg-emerald-500/8" },
+  other: { leftBorder: "border-l-zinc-500", bg: "bg-zinc-500/8" },
+}
+
 function eventBarColor(type: ScheduleEvent["type"]) {
   if (type === "study") return "bg-blue-400"
   if (type === "assignment") return "bg-orange-400"
@@ -38,39 +79,150 @@ function eventBarColor(type: ScheduleEvent["type"]) {
   return "bg-zinc-400"
 }
 
-const EVENT_TYPE_CONFIG: Record<ScheduleEvent["type"], { color: string; bg: string; label: string }> = {
-  study: { color: "border-l-blue-500", bg: "bg-blue-500/8", label: "Study" },
-  assignment: { color: "border-l-orange-500", bg: "bg-orange-500/8", label: "Assignment" },
-  exam: { color: "border-l-rose-500", bg: "bg-rose-500/8", label: "Exam" },
-  break: { color: "border-l-emerald-500", bg: "bg-emerald-500/8", label: "Break" },
-  other: { color: "border-l-zinc-500", bg: "bg-zinc-500/8", label: "Other" },
+function sortScheduleEvents(events: ScheduleEvent[]) {
+  return [...events].sort((a, b) => {
+    const aAllDay = !a.start_time
+    const bAllDay = !b.start_time
+    if (aAllDay !== bAllDay) return aAllDay ? -1 : 1
+
+    const aTime = a.start_time ?? "99:99"
+    const bTime = b.start_time ?? "99:99"
+    if (aTime !== bTime) return aTime.localeCompare(bTime)
+
+    if ((a.source ?? "calendar") !== (b.source ?? "calendar")) {
+      return (a.source ?? "calendar") === "calendar" ? -1 : 1
+    }
+
+    return a.title.localeCompare(b.title)
+  })
+}
+
+function buildTemplateEvents(
+  slots: TemplateSlot[],
+  rangeStart: Date,
+  rangeEnd: Date
+): ScheduleEvent[] {
+  const results: ScheduleEvent[] = []
+  let current = new Date(rangeStart)
+  current.setHours(0, 0, 0, 0)
+
+  const end = new Date(rangeEnd)
+  end.setHours(0, 0, 0, 0)
+
+  while (current <= end) {
+    const dateKey = format(current, "yyyy-MM-dd")
+    const dayOfWeek = (current.getDay() + 6) % 7
+
+    slots.forEach((slot) => {
+      if (slot.day_of_week !== dayOfWeek) return
+
+      const stamp = Number(format(current, "yyyyMMdd"))
+      results.push({
+        id: -(stamp * 10000 + slot.id),
+        title: slot.title,
+        type: "other",
+        course_id: slot.course_id,
+        date: dateKey,
+        start_time: slot.start_time,
+        duration: slot.duration_minutes,
+        notes: "Template anchor",
+        ai_suggested: false,
+        created_at: slot.created_at,
+        source: "template",
+        display_color: slot.color,
+      })
+    })
+
+    current = addDays(current, 1)
+  }
+
+  return sortScheduleEvents(results)
+}
+
+function EventFormFields({
+  form,
+  setForm,
+  courses,
+}: {
+  form: EventForm
+  setForm: Dispatch<SetStateAction<EventForm>>
+  courses: Course[]
+}) {
+  return (
+    <div className="space-y-2">
+      <input
+        value={form.title}
+        onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+        placeholder="Title *"
+        className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <select
+          value={form.type}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, type: e.target.value as EventForm["type"] }))
+          }
+          className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+        >
+          {(["study", "assignment", "exam", "break", "other"] as const).map((t) => (
+            <option key={t} value={t}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </option>
+          ))}
+        </select>
+        <input
+          value={form.date}
+          type="date"
+          onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+          className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          value={form.start_time}
+          type="time"
+          onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))}
+          className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+        />
+        <input
+          value={String(form.duration)}
+          type="number"
+          onChange={(e) =>
+            setForm((p) => ({ ...p, duration: Number(e.target.value || 0) }))
+          }
+          placeholder="Duration (min)"
+          className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
+        />
+      </div>
+      <select
+        value={form.course_id}
+        onChange={(e) => setForm((p) => ({ ...p, course_id: e.target.value }))}
+        className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
+      >
+        <option value="">No linked course</option>
+        {courses.map((c) => (
+          <option key={c.id} value={String(c.id)}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <textarea
+        value={form.notes}
+        onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+        placeholder="Notes"
+        className="min-h-[70px] w-full rounded-[7px] border border-b1 bg-s2 px-3 py-2 text-[12px] text-tx outline-none resize-none"
+      />
+    </div>
+  )
 }
 
 export default function SchedulePage() {
-  const [cursorDate, setCursorDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [mainTab, setMainTab] = useState<MainTab>("calendar")
+  const [calView, setCalView] = useState<CalendarView>("monthly")
+  const [activeDate, setActiveDate] = useState(new Date())
+
   const [addModalOpen, setAddModalOpen] = useState(false)
-  const [provider, setProvider] = useState<"groq" | "local" | "ollama">("groq")
-  const [eventForm, setEventForm] = useState<EventForm>({
-    title: "",
-    type: "study",
-    date: format(new Date(), "yyyy-MM-dd"),
-    start_time: "",
-    duration: 60,
-    notes: "",
-    course_id: "",
-  })
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null)
-  const [editForm, setEditForm] = useState<EventForm>({
-    title: "",
-    type: "study",
-    date: "",
-    start_time: "",
-    duration: 60,
-    notes: "",
-    course_id: "",
-  })
-  const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([])
   const [confirm, setConfirm] = useState<{
     title: string
     description: string
@@ -78,51 +230,89 @@ export default function SchedulePage() {
     onConfirm: () => void
   } | null>(null)
 
-  const year = cursorDate.getFullYear()
-  const month = cursorDate.getMonth() + 1
+  const blankForm: EventForm = {
+    title: "",
+    type: "study",
+    date: format(new Date(), "yyyy-MM-dd"),
+    start_time: "",
+    duration: 60,
+    notes: "",
+    course_id: "",
+  }
+  const [eventForm, setEventForm] = useState<EventForm>(blankForm)
+  const [editForm, setEditForm] = useState<EventForm>(blankForm)
+
+  const [provider, setProvider] = useState<"groq" | "local" | "ollama">("groq")
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([])
+
+  const year = activeDate.getFullYear()
+  const month = activeDate.getMonth() + 1
+
   const monthEventsQuery = useMonthEvents(year, month)
+  const templateSlotsQuery = useTemplateSlots()
   const coursesQuery = useQuery({
     queryKey: ["courses"],
     queryFn: () => api.get<Course[]>("/notes/courses"),
   })
+  const prefsQuery = useSchedulePreferences()
   const createEvent = useCreateEvent()
   const deleteEvent = useDeleteEvent()
   const updateEvent = useUpdateEvent()
   const suggestionsQuery = useSuggestions(provider)
   const acceptSuggestion = useAcceptSuggestion()
 
+  const courses = coursesQuery.data ?? []
+
   const monthCells = useMemo(() => {
-    const start = startOfWeek(startOfMonth(cursorDate), { weekStartsOn: 0 })
-    const end = endOfWeek(endOfMonth(cursorDate), { weekStartsOn: 0 })
+    const start = startOfWeek(startOfMonth(activeDate), { weekStartsOn: 0 })
+    const end = endOfWeek(endOfMonth(activeDate), { weekStartsOn: 0 })
     const cells: Date[] = []
-    let current = start
-    while (current <= end) {
-      cells.push(current)
-      current = addDays(current, 1)
+    let cur = start
+    while (cur <= end) {
+      cells.push(cur)
+      cur = addDays(cur, 1)
     }
-    while (cells.length < 42) {
-      cells.push(addDays(cells[cells.length - 1], 1))
-    }
+    while (cells.length < 42) cells.push(addDays(cells[cells.length - 1], 1))
     return cells
-  }, [cursorDate])
+  }, [activeDate])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>()
-    ;(monthEventsQuery.data ?? []).forEach((event) => {
-      const key = event.date
-      const list = map.get(key) ?? []
-      list.push(event)
-      map.set(key, list)
+    ;(monthEventsQuery.data ?? []).forEach((ev) => {
+      map.set(ev.date, [...(map.get(ev.date) ?? []), { ...ev, source: "calendar" }])
     })
     return map
   }, [monthEventsQuery.data])
 
-  const selectedDayKey = format(selectedDate, "yyyy-MM-dd")
-  const selectedDayEvents = eventsByDate.get(selectedDayKey) ?? []
+  const selectedDayKey = format(activeDate, "yyyy-MM-dd")
+  const selectedTemplateEvents = useMemo(
+    () => buildTemplateEvents(templateSlotsQuery.data ?? [], activeDate, activeDate),
+    [activeDate, templateSlotsQuery.data]
+  )
+  const selectedDayEvents = useMemo(
+    () => sortScheduleEvents([...(eventsByDate.get(selectedDayKey) ?? []), ...selectedTemplateEvents]),
+    [eventsByDate, selectedDayKey, selectedTemplateEvents]
+  )
+
+  const gridEvents = useMemo(() => {
+    const baseEvents = (monthEventsQuery.data ?? []).map((event) => ({
+      ...event,
+      source: "calendar" as const,
+    }))
+
+    if (calView === "monthly") return baseEvents
+
+    const rangeStart = calView === "weekly" ? startOfWeek(activeDate, { weekStartsOn: 1 }) : activeDate
+    const rangeEnd = calView === "weekly" ? addDays(rangeStart, 6) : activeDate
+    const templateEvents = buildTemplateEvents(templateSlotsQuery.data ?? [], rangeStart, rangeEnd)
+
+    return sortScheduleEvents([...baseEvents, ...templateEvents])
+  }, [activeDate, calView, monthEventsQuery.data, templateSlotsQuery.data])
 
   const visibleSuggestions = useMemo(() => {
-    const list = suggestionsQuery.data?.suggestions ?? []
-    return list.filter((s) => !dismissedSuggestions.includes(`${s.title}-${s.date}-${s.start_time}`))
+    return (suggestionsQuery.data?.suggestions ?? []).filter(
+      (s) => !dismissedSuggestions.includes(`${s.title}-${s.date}-${s.start_time}`)
+    )
   }, [dismissedSuggestions, suggestionsQuery.data?.suggestions])
 
   const addEvent = async () => {
@@ -142,22 +332,35 @@ export default function SchedulePage() {
       })
       toast.success("Event added")
       setAddModalOpen(false)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to add event"
-      toast.error(message)
+      setEventForm(blankForm)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add event")
     }
   }
 
-  const openEditEvent = (event: ScheduleEvent) => {
-    setEditingEvent(event)
+  const handleDeleteEvent = (id: number, title: string) => {
+    setConfirm({
+      title: "Delete Event",
+      description: `"${title}" will be removed from your schedule.`,
+      confirmLabel: "Delete",
+      onConfirm: async () => {
+        setConfirm(null)
+        await deleteEvent.mutateAsync(id)
+        toast.success("Event deleted")
+      },
+    })
+  }
+
+  const openEditEvent = (ev: ScheduleEvent) => {
+    setEditingEvent(ev)
     setEditForm({
-      title: event.title,
-      type: event.type,
-      date: event.date ? event.date.slice(0, 10) : "",
-      start_time: event.start_time ? event.start_time.slice(0, 5) : "",
-      duration: event.duration ?? 60,
-      notes: event.notes ?? "",
-      course_id: event.course_id ? String(event.course_id) : "",
+      title: ev.title,
+      type: ev.type,
+      date: ev.date?.slice(0, 10) ?? "",
+      start_time: ev.start_time?.slice(0, 5) ?? "",
+      duration: ev.duration ?? 60,
+      notes: ev.notes ?? "",
+      course_id: ev.course_id ? String(ev.course_id) : "",
     })
   }
 
@@ -167,338 +370,445 @@ export default function SchedulePage() {
       toast.error("Title is required")
       return
     }
-    const normalizedDate = editForm.date.includes("T") ? editForm.date.split("T")[0] : editForm.date
-    if (!normalizedDate) {
-      toast.error("Date is required")
-      return
-    }
+    const normDate = editForm.date.includes("T") ? editForm.date.split("T")[0] : editForm.date
     try {
-      const trimmedNotes = editForm.notes.trim()
-      const normalizedDuration = editForm.duration > 0 ? editForm.duration : null
-      const normalizedStartTime =
-        editForm.start_time && editForm.start_time.length === 5
-          ? `${editForm.start_time}:00`
-          : editForm.start_time || null
-      const normalizedNotes = trimmedNotes || null
-      const normalizedCourseId = editForm.course_id ? Number(editForm.course_id) : null
-      const payload: {
-        title?: string
-        type?: EventForm["type"]
-        date?: string
-        start_time?: string | null
-        duration?: number | null
-        notes?: string | null
-        course_id?: number | null
-      } = {}
-
-      if (editForm.title.trim() !== editingEvent.title) payload.title = editForm.title.trim()
-      if (editForm.type !== editingEvent.type) payload.type = editForm.type
-      if (normalizedDate !== editingEvent.date) payload.date = normalizedDate
-      if (normalizedStartTime !== (editingEvent.start_time ?? null)) payload.start_time = normalizedStartTime
-      if (normalizedDuration !== (editingEvent.duration ?? null)) payload.duration = normalizedDuration
-      if (normalizedNotes !== (editingEvent.notes ?? null)) payload.notes = normalizedNotes
-      if (normalizedCourseId !== (editingEvent.course_id ?? null)) payload.course_id = normalizedCourseId
-
-      if (Object.keys(payload).length === 0) {
-        toast.message("No changes to save")
-        setEditingEvent(null)
-        return
-      }
-
       await updateEvent.mutateAsync({
         id: editingEvent.id,
-        data: payload,
+        data: {
+          title: editForm.title.trim(),
+          type: editForm.type,
+          date: normDate,
+          start_time: editForm.start_time
+            ? editForm.start_time.length === 5
+              ? `${editForm.start_time}:00`
+              : editForm.start_time
+            : null,
+          duration: editForm.duration > 0 ? editForm.duration : null,
+          notes: editForm.notes.trim() || null,
+          course_id: editForm.course_id ? Number(editForm.course_id) : null,
+        },
       })
       toast.success("Event updated")
       setEditingEvent(null)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update event")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update event")
     }
   }
 
+  const handleSlotClick = (date: string, time: string) => {
+    setEventForm((p) => ({ ...p, date, start_time: time }))
+    setAddModalOpen(true)
+  }
+
+  const handleCalendarEventClick = (ev: ScheduleEvent) => {
+    if (ev.source === "template") {
+      toast.message("Template anchors are edited from the Weekly Template tab.")
+      return
+    }
+    openEditEvent(ev)
+  }
+
   return (
-    <div className="animate-fadeUp">
-      <div className="flex items-center justify-between mb-4">
+    <div
+      className="animate-fadeUp flex flex-col"
+      style={{ height: "calc(100vh - 50px - 2rem)" }}
+    >
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <div>
           <h1 className="text-[19px] font-bold tracking-tight">Smart Schedule</h1>
-          <p className="text-[12.5px] text-tx2 mt-1">Plan your week with AI support.</p>
+          <p className="text-[12.5px] text-tx2 mt-0.5">Plan your week with AI support.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setAddModalOpen(true)}
-          className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 inline-flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Event
-        </button>
-      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-3">
-        <div className="rounded-[10px] border border-b1 bg-s1 p-3">
-          <div className="flex items-center justify-between mb-3">
-            <button type="button" className="w-8 h-8 rounded-[7px] border border-b1 bg-s2 text-tx3 hover:bg-s3" onClick={() => setCursorDate(addDays(startOfMonth(cursorDate), -1))}>
-              <ChevronLeft className="w-4 h-4 mx-auto" />
-            </button>
-            <h2 className="text-[14px] font-semibold">{format(cursorDate, "MMMM yyyy")}</h2>
-            <button type="button" className="w-8 h-8 rounded-[7px] border border-b1 bg-s2 text-tx3 hover:bg-s3" onClick={() => setCursorDate(addDays(endOfMonth(cursorDate), 1))}>
-              <ChevronRight className="w-4 h-4 mx-auto" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-7 text-[10px] font-mono text-tx3 mb-1">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div key={day} className="px-1 py-1">{day}</div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {monthCells.map((cell) => {
-              const key = format(cell, "yyyy-MM-dd")
-              const events = eventsByDate.get(key) ?? []
-              const selected = isSameDay(cell, selectedDate)
-              const today = isSameDay(cell, new Date())
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedDate(cell)}
-                  className={cn(
-                    "h-[70px] rounded-[7px] border p-1 text-left transition-colors duration-[120ms]",
-                    selected ? "border-blue-500/40 bg-[var(--bd)]" : "border-b1 bg-s2/30 hover:bg-s2/70",
-                    !isSameMonth(cell, cursorDate) && "opacity-30"
-                  )}
-                >
-                  <span className={cn("text-[10px] font-mono", today ? "text-blue-300" : "text-tx2")}>{format(cell, "d")}</span>
-                  <div className="mt-1 space-y-0.5">
-                    {events.slice(0, 2).map((event) => (
-                      <div key={event.id} className={cn("h-1 rounded-full", eventBarColor(event.type))} />
-                    ))}
-                    {events.length > 2 ? <p className="text-[9px] text-tx3">+{events.length - 2}</p> : null}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="mt-3 rounded-[10px] border border-b1 bg-s2/40 p-3">
-            <h3 className="text-[13px] font-semibold mb-2">{format(selectedDate, "EEEE, MMM d")}</h3>
-            {selectedDayEvents.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-[13px] text-tx2">No events on {format(selectedDate, "EEEE, MMM d")}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEventForm((p) => ({ ...p, date: selectedDayKey }))
-                    setAddModalOpen(true)
-                  }}
-                  className="mt-2 h-7 px-3 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600 inline-flex items-center gap-1.5"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add Event
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {selectedDayEvents.map((event) => {
-                  const cfg = EVENT_TYPE_CONFIG[event.type]
-                  return (
-                    <div
-                      key={event.id}
-                      className={`rounded-[8px] border border-b1 border-l-2 ${cfg.color} ${cfg.bg} px-3 py-2.5`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] text-tx font-medium truncate">{event.title}</p>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-tx3">
-                            {event.start_time && <span>🕐 {event.start_time}</span>}
-                            {event.duration && <span>{event.duration}min</span>}
-                            {!event.start_time && !event.duration && <span>{cfg.label}</span>}
-                          </div>
-                          {event.notes && (
-                            <p className="text-[10px] text-tx3 mt-1 truncate">{event.notes}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openEditEvent(event)}
-                            className="h-7 px-2 rounded-[6px] border border-b1 bg-s2/60 text-tx3 hover:text-tx hover:bg-s2 transition-colors"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirm({
-                              title: "Delete Event",
-                              description: "This event will be removed from your schedule.",
-                              confirmLabel: "Delete",
-                              onConfirm: async () => {
-                                setConfirm(null)
-                                await deleteEvent.mutateAsync(event.id)
-                                toast.success("Event deleted")
-                              },
-                            })}
-                            className="h-7 px-2 rounded-[6px] border border-rose-500/25 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="rounded-[10px] border border-b1 bg-s1 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[13px] font-semibold flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-violet-300" />
-                AI Suggestions
-              </h3>
-              <select value={provider} onChange={(e) => setProvider(e.target.value as "groq" | "local" | "ollama")} className="h-7 rounded-[7px] border border-b1 bg-s2 px-2 text-[11px] text-tx">
-                <option value="groq">Groq</option>
-                <option value="local">Local</option>
-                <option value="ollama">Ollama</option>
-              </select>
-            </div>
+        <div className="flex items-center gap-2">
+          {(["calendar", "template"] as const).map((tab) => (
             <button
+              key={tab}
               type="button"
-              onClick={() => void suggestionsQuery.refetch()}
-              disabled={suggestionsQuery.isFetching}
-              className="h-8 px-3 rounded-[7px] bg-violet-500 text-white text-[12px] hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              onClick={() => setMainTab(tab)}
+              className={cn(
+                "h-8 px-3 rounded-[7px] border text-[12px] transition-colors inline-flex items-center gap-1.5",
+                mainTab === tab
+                  ? "bg-[var(--bd)] border-blue-500/30 text-blue-300"
+                  : "bg-s2 border-b1 text-tx2 hover:bg-s3"
+              )}
             >
-              {suggestionsQuery.isFetching ? (
+              {tab === "calendar" ? (
                 <>
-                  <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Generating...
+                  <CalendarDays className="w-3.5 h-3.5" /> Calendar
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Get AI Suggestions
+                  <Layout className="w-3.5 h-3.5" /> Template
                 </>
               )}
             </button>
-            {suggestionsQuery.isError && (
-              <div className="mt-2 rounded-[7px] border border-rose-500/25 bg-rose-500/10 px-3 py-2">
-                <p className="text-[11px] text-rose-300">
-                  {suggestionsQuery.error instanceof Error
-                    ? suggestionsQuery.error.message
-                    : "Failed to get suggestions"}
-                </p>
-              </div>
-            )}
-            <div className="mt-3 space-y-2">
-              {suggestionsQuery.data !== undefined && visibleSuggestions.length === 0 && !suggestionsQuery.isFetching && (
-                <div className="rounded-[7px] border border-b1 bg-s2/40 px-3 py-3 text-center">
-                  <p className="text-[12px] text-tx2">
-                    {suggestionsQuery.data.message || "No suggestions available."}
-                  </p>
-                </div>
-              )}
-              {visibleSuggestions.map((suggestion) => {
-                const key = `${suggestion.title}-${suggestion.date}-${suggestion.start_time}`
-                return (
-                  <div key={key} className="rounded-[7px] border border-b1 bg-s2/40 p-2">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-[12px] text-tx">{suggestion.title}</p>
-                      {suggestion.priority && (
-                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-[4px] flex-shrink-0 ${
-                          suggestion.priority === "high"
-                            ? "bg-rose-500/15 text-rose-300"
-                            : suggestion.priority === "medium"
-                              ? "bg-amber-500/15 text-amber-300"
-                              : "bg-emerald-500/15 text-emerald-300"
-                        }`}>
-                          {suggestion.priority}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-tx3 font-mono">
-                      {suggestion.date} Ã‚Â· {suggestion.start_time} Ã‚Â· {suggestion.duration}min
-                    </p>
-                    <p className="text-[11px] text-tx2 mt-1">{suggestion.reason ?? "AI-generated suggestion"}</p>
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await acceptSuggestion.mutateAsync(suggestion)
-                            toast.success("Suggestion scheduled")
-                          } catch {
-                            toast.error("Failed to schedule suggestion")
-                          }
-                        }}
-                        disabled={acceptSuggestion.isPending}
-                        className="h-7 px-2 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600 disabled:opacity-50"
-                      >
-                        Schedule it
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDismissedSuggestions((prev) => [...prev, key])}
-                        className="h-7 px-2 rounded-[7px] border border-b1 bg-s2 text-tx2 text-[11px] hover:bg-s3"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          ))}
 
-          <div className="rounded-[10px] border border-b1 bg-s1 p-3">
-            <h3 className="text-[13px] font-semibold mb-2">Upcoming Deadlines</h3>
-            <div className="space-y-1">
-              {(monthEventsQuery.data ?? [])
-                .filter((event) => event.type === "assignment" || event.type === "exam")
-                .slice(0, 6)
-                .map((event) => (
-                  <div key={`deadline-${event.id}`} className="rounded-[7px] border border-b1 bg-s2/40 px-2 py-1.5 text-[11px] text-tx2">
-                    {event.title} Ã‚Â· <span className="font-mono text-tx3">{event.date}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
+          {mainTab === "calendar" && (
+            <button
+              type="button"
+              onClick={() => setAddModalOpen(true)}
+              className="h-8 px-3 rounded-[7px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Event
+            </button>
+          )}
         </div>
       </div>
+
+      <div className="flex-shrink-0 mb-3">
+        <AdjustmentBanner />
+      </div>
+
+      {mainTab === "template" && (
+        <div className="flex-1 overflow-y-auto">
+          <TemplateTab />
+        </div>
+      )}
+
+      {mainTab === "calendar" && (
+        <>
+          <div className="flex gap-1.5 mb-3 flex-shrink-0">
+            {(["monthly", "weekly", "daily"] as const).map((view) => (
+              <button
+                key={view}
+                type="button"
+                onClick={() => setCalView(view)}
+                className={cn(
+                  "h-7 px-3 rounded-[6px] border text-[11px] transition-colors inline-flex items-center gap-1",
+                  calView === view
+                    ? "bg-s2 border-b2 text-tx"
+                    : "bg-s1 border-b1 text-tx3 hover:bg-s2 hover:text-tx2"
+                )}
+              >
+                {view === "monthly" && (
+                  <>
+                    <Calendar className="w-3 h-3" /> Month
+                  </>
+                )}
+                {view === "weekly" && (
+                  <>
+                    <CalendarDays className="w-3 h-3" /> Week
+                  </>
+                )}
+                {view === "daily" && (
+                  <>
+                    <Clock className="w-3 h-3" /> Day
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-3 flex-1 min-h-0 overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden">
+              {calView === "monthly" && (
+                <div className="rounded-[10px] border border-b1 bg-s1 p-3 flex flex-col h-full overflow-hidden">
+                  <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDate(addDays(startOfMonth(activeDate), -1))}
+                      className="w-8 h-8 rounded-[7px] border border-b1 bg-s2 hover:bg-s3 flex items-center justify-center"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-tx3" />
+                    </button>
+                    <h2 className="text-[14px] font-semibold">{format(activeDate, "MMMM yyyy")}</h2>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDate(addDays(endOfMonth(activeDate), 1))}
+                      className="w-8 h-8 rounded-[7px] border border-b1 bg-s2 hover:bg-s3 flex items-center justify-center"
+                    >
+                      <ChevronRight className="w-4 h-4 text-tx3" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-7 text-[10px] font-mono text-tx3 mb-1 flex-shrink-0">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                      <div key={d} className="px-1 py-1">
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1 flex-1 overflow-hidden">
+                    {monthCells.map((cell) => {
+                      const key = format(cell, "yyyy-MM-dd")
+                      const events = eventsByDate.get(key) ?? []
+                      const isSelected = isSameDay(cell, activeDate)
+                      const isToday = isSameDay(cell, new Date())
+                      const inMonth = isSameMonth(cell, activeDate)
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setActiveDate(cell)}
+                          className={cn(
+                            "rounded-[7px] border p-1 text-left transition-colors min-h-[56px]",
+                            isSelected
+                              ? "border-blue-500/40 bg-[var(--bd)]"
+                              : isToday
+                                ? "border-blue-500/20 bg-s2"
+                                : !inMonth
+                                  ? "border-transparent opacity-30"
+                                  : "border-b1 bg-s1 hover:bg-s2"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "text-[11px] font-mono block mb-1",
+                              isToday ? "text-blue-300 font-bold" : "text-tx3"
+                            )}
+                          >
+                            {format(cell, "d")}
+                          </span>
+                          <div className="space-y-0.5">
+                            {events.slice(0, 2).map((ev) => (
+                              <div key={ev.id} className={cn("h-1.5 rounded-full", eventBarColor(ev.type))} />
+                            ))}
+                            {events.length > 2 && (
+                              <span className="text-[8px] text-tx3 font-mono">+{events.length - 2}</span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {calView === "weekly" && (
+                <div className="flex h-full min-h-0 flex-col">
+                  <WeeklyView
+                    currentDate={activeDate}
+                    events={gridEvents}
+                    preferences={prefsQuery.data}
+                    onDateChange={setActiveDate}
+                    onEventClick={handleCalendarEventClick}
+                    onSlotClick={handleSlotClick}
+                  />
+                </div>
+              )}
+
+              {calView === "daily" && (
+                <div className="flex h-full min-h-0 flex-col">
+                  <DailyView
+                    currentDate={activeDate}
+                    events={gridEvents}
+                    preferences={prefsQuery.data}
+                    onDateChange={setActiveDate}
+                    onEventClick={handleCalendarEventClick}
+                    onSlotClick={handleSlotClick}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 overflow-y-auto min-h-0">
+              <div className="rounded-[10px] border border-b1 bg-s1 p-3 flex-shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[13px] font-semibold">{format(activeDate, "EEEE, MMM d")}</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEventForm((p) => ({ ...p, date: selectedDayKey }))
+                      setAddModalOpen(true)
+                    }}
+                    className="h-6 px-2 rounded-[5px] bg-s2 border border-b1 text-[10px] text-tx2 hover:bg-s3 inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-2.5 h-2.5" /> Add
+                  </button>
+                </div>
+
+                {selectedDayEvents.length === 0 ? (
+                  <p className="text-[11px] text-tx3">Nothing scheduled.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {selectedDayEvents.map((ev) => {
+                      const cfg = EVENT_TYPE_CONFIG[ev.type]
+                      const isTemplateEvent = ev.source === "template"
+                      return (
+                        <div
+                          key={ev.id}
+                          className={cn(
+                            "rounded-[7px] border border-b1 border-l-2 px-2.5 py-2",
+                            cfg.leftBorder,
+                            cfg.bg
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[12px] text-tx font-medium truncate">
+                                {ev.title}
+                                {isTemplateEvent && (
+                                  <span className="ml-1 text-[9px] text-blue-300 font-mono">TEMPLATE</span>
+                                )}
+                                {ev.ai_suggested && (
+                                  <span className="ml-1 text-[9px] text-violet-400 font-mono">AI</span>
+                                )}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5 text-[10px] font-mono text-tx3">
+                                {ev.start_time && <span>Time {ev.start_time.slice(0, 5)}</span>}
+                                {ev.duration && <span>{ev.duration}min</span>}
+                              </div>
+                              {ev.notes && <p className="text-[10px] text-tx3 mt-0.5 truncate">{ev.notes}</p>}
+                            </div>
+                            {!isTemplateEvent && (
+                              <div className="flex gap-1 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditEvent(ev)}
+                                  className="h-6 w-6 rounded-[4px] text-tx3 hover:text-tx hover:bg-s2 flex items-center justify-center transition-colors"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEvent(ev.id, ev.title)}
+                                  className="h-6 w-6 rounded-[4px] text-tx3 hover:text-rose-300 hover:bg-rose-500/10 flex items-center justify-center transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[10px] border border-b1 bg-s1 p-3 flex-shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[13px] font-semibold">AI Suggestions</h3>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={provider}
+                      onChange={(e) => setProvider(e.target.value as typeof provider)}
+                      className="h-6 rounded-[5px] border border-b1 bg-s2 px-1.5 text-[10px] text-tx"
+                    >
+                      <option value="groq">Groq</option>
+                      <option value="local">Local</option>
+                      <option value="ollama">Ollama</option>
+                    </select>
+                    <button
+                      type="button"
+                      disabled={suggestionsQuery.isFetching}
+                      onClick={() => void suggestionsQuery.refetch()}
+                      className="h-6 px-2 rounded-[5px] bg-s2 border border-b1 text-[10px] text-tx2 hover:bg-s3 disabled:opacity-40 inline-flex items-center gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {suggestionsQuery.isFetching ? "Loading..." : "Generate"}
+                    </button>
+                  </div>
+                </div>
+
+                {suggestionsQuery.data?.message && visibleSuggestions.length === 0 && (
+                  <p className="text-[11px] text-tx3">{suggestionsQuery.data.message}</p>
+                )}
+
+                <div className="space-y-2">
+                  {visibleSuggestions.map((s) => {
+                    const key = `${s.title}-${s.date}-${s.start_time}`
+                    return (
+                      <div key={key} className="rounded-[7px] border border-b1 bg-s2/40 p-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[12px] text-tx font-medium flex-1 truncate">{s.title}</span>
+                          {s.priority && (
+                            <span
+                              className={cn(
+                                "text-[9px] font-mono px-1.5 py-0.5 rounded-[4px]",
+                                s.priority === "high"
+                                  ? "bg-rose-500/15 text-rose-400"
+                                  : s.priority === "medium"
+                                    ? "bg-amber-500/15 text-amber-400"
+                                    : "bg-emerald-500/15 text-emerald-400"
+                              )}
+                            >
+                              {s.priority}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-tx3 font-mono">
+                          {s.date} | {s.start_time} | {s.duration}min
+                        </p>
+                        <p className="text-[11px] text-tx2 mt-1">{s.reason ?? "AI-generated suggestion"}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={acceptSuggestion.isPending}
+                            onClick={async () => {
+                              try {
+                                await acceptSuggestion.mutateAsync(s)
+                                toast.success("Suggestion scheduled")
+                              } catch {
+                                toast.error("Failed to schedule")
+                              }
+                            }}
+                            className="h-7 px-2 rounded-[7px] bg-blue-500 text-white text-[11px] hover:bg-blue-600 disabled:opacity-50"
+                          >
+                            Schedule it
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDismissedSuggestions((prev) => [...prev, key])}
+                            className="h-7 px-2 rounded-[7px] border border-b1 bg-s2 text-tx2 text-[11px] hover:bg-s3"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-[10px] border border-b1 bg-s1 p-3 flex-shrink-0">
+                <h3 className="text-[13px] font-semibold mb-2">Upcoming Deadlines</h3>
+                <div className="space-y-1">
+                  {(monthEventsQuery.data ?? [])
+                    .filter((ev) => ev.type === "assignment" || ev.type === "exam")
+                    .slice(0, 6)
+                    .map((ev) => (
+                      <div
+                        key={`dl-${ev.id}`}
+                        className="rounded-[7px] border border-b1 bg-s2/40 px-2 py-1.5 flex items-center justify-between text-[11px]"
+                      >
+                        <span className="text-tx2 truncate">{ev.title}</span>
+                        <span className="text-tx3 font-mono flex-shrink-0 ml-2">{ev.date}</span>
+                      </div>
+                    ))}
+                  {(monthEventsQuery.data ?? []).filter(
+                    (ev) => ev.type === "assignment" || ev.type === "exam"
+                  ).length === 0 && <p className="text-[11px] text-tx3">No upcoming deadlines.</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
         <DialogContent className="bg-s1 border-b1 rounded-[12px]">
           <DialogHeader>
             <DialogTitle>Add Event</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <input value={eventForm.title} onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))} placeholder="Title *" className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none" />
-            <div className="grid grid-cols-2 gap-2">
-              <select value={eventForm.type} onChange={(e) => setEventForm((p) => ({ ...p, type: e.target.value as EventForm["type"] }))} className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx">
-                <option value="study">Study</option>
-                <option value="assignment">Assignment</option>
-                <option value="exam">Exam</option>
-                <option value="break">Break</option>
-                <option value="other">Other</option>
-              </select>
-              <input value={eventForm.date} type="date" onChange={(e) => setEventForm((p) => ({ ...p, date: e.target.value }))} className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input value={eventForm.start_time} type="time" onChange={(e) => setEventForm((p) => ({ ...p, start_time: e.target.value }))} className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none" />
-              <input value={String(eventForm.duration)} type="number" onChange={(e) => setEventForm((p) => ({ ...p, duration: Number(e.target.value || 0) }))} placeholder="Duration (min)" className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none" />
-            </div>
-            <select value={eventForm.course_id} onChange={(e) => setEventForm((p) => ({ ...p, course_id: e.target.value }))} className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx">
-              <option value="">No linked course</option>
-              {(coursesQuery.data ?? []).map((course) => (
-                <option key={course.id} value={String(course.id)}>{course.name}</option>
-              ))}
-            </select>
-            <textarea value={eventForm.notes} onChange={(e) => setEventForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" className="min-h-[80px] w-full rounded-[7px] border border-b1 bg-s2 px-3 py-2 text-[12px] text-tx outline-none resize-none" />
-          </div>
+          <EventFormFields form={eventForm} setForm={setEventForm} courses={courses} />
           <DialogFooter>
-            <button type="button" onClick={() => setAddModalOpen(false)} className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3">Cancel</button>
-            <button type="button" onClick={() => void addEvent()} className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600">Add Event</button>
+            <button
+              type="button"
+              onClick={() => setAddModalOpen(false)}
+              className="h-8 px-3 rounded-[7px] border border-b1 bg-s2 text-tx2 hover:bg-s3"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void addEvent()}
+              className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Add Event
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -508,66 +818,7 @@ export default function SchedulePage() {
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <input
-              value={editForm.title}
-              onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
-              placeholder="Event title *"
-              className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <select
-                value={editForm.type}
-                onChange={(e) => setEditForm((p) => ({ ...p, type: e.target.value as EventForm["type"] }))}
-                className="h-9 rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
-              >
-                <option value="study">Study</option>
-                <option value="assignment">Assignment</option>
-                <option value="exam">Exam</option>
-                <option value="break">Break</option>
-                <option value="other">Other</option>
-              </select>
-              <input
-                value={editForm.date}
-                type="date"
-                onChange={(e) => setEditForm((p) => ({ ...p, date: e.target.value }))}
-                className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                value={editForm.start_time}
-                type="time"
-                onChange={(e) => setEditForm((p) => ({ ...p, start_time: e.target.value }))}
-                className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
-              />
-              <input
-                value={String(editForm.duration)}
-                type="number"
-                onChange={(e) => setEditForm((p) => ({ ...p, duration: Number(e.target.value || 0) }))}
-                placeholder="Duration (min)"
-                className="h-9 rounded-[7px] border border-b1 bg-s2 px-3 text-[12px] text-tx outline-none"
-              />
-            </div>
-            <select
-              value={editForm.course_id}
-              onChange={(e) => setEditForm((p) => ({ ...p, course_id: e.target.value }))}
-              className="h-9 w-full rounded-[7px] border border-b1 bg-s2 px-2 text-[12px] text-tx"
-            >
-              <option value="">No linked course</option>
-              {(coursesQuery.data ?? []).map((course) => (
-                <option key={course.id} value={String(course.id)}>
-                  {course.name}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={editForm.notes}
-              onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
-              placeholder="Notes"
-              className="min-h-[80px] w-full rounded-[7px] border border-b1 bg-s2 px-3 py-2 text-[12px] text-tx outline-none resize-none"
-            />
-          </div>
+          <EventFormFields form={editForm} setForm={setEditForm} courses={courses} />
           <DialogFooter>
             <button
               type="button"
@@ -578,11 +829,11 @@ export default function SchedulePage() {
             </button>
             <button
               type="button"
-              onClick={() => void saveEditEvent()}
               disabled={updateEvent.isPending}
+              onClick={() => void saveEditEvent()}
               className="h-8 px-3 rounded-[7px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40"
             >
-              {updateEvent.isPending ? "SavingÃ¢â‚¬Â¦" : "Save Changes"}
+              {updateEvent.isPending ? "Saving..." : "Save Changes"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -599,8 +850,3 @@ export default function SchedulePage() {
     </div>
   )
 }
-
-
-
-
-

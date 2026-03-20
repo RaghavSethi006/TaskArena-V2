@@ -63,6 +63,39 @@
 
 @layer utilities {
   .font-mono { font-family: 'DM Mono', monospace; }
+
+  .scrollbar-stealth {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-stealth::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  .scrollbar-stealth.is-scrolling {
+    scrollbar-color: #3f3f46 transparent;
+  }
+
+  .scrollbar-stealth.is-scrolling::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+  }
+
+  .scrollbar-stealth:hover {
+    scrollbar-color: #3f3f46 transparent;
+  }
+
+  .scrollbar-stealth:hover::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+  }
+
+  .scrollbar-stealth:focus-within {
+    scrollbar-color: #3f3f46 transparent;
+  }
+
+  .scrollbar-stealth:focus-within::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+  }
 }
 
 /* Page transition */
