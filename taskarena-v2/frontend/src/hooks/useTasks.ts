@@ -3,6 +3,7 @@ import { api } from "../api/client"
 import type { Task, TaskCreate } from "../types"
 import { auth } from "@/lib/firebase"
 import { syncStatsToFirebase } from "@/hooks/useLobbies"
+import { useScheduleStore } from "@/stores/scheduleStore"
 
 export interface TaskUpdate {
   title?: string
@@ -36,7 +37,23 @@ export function useCreateTask() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: TaskCreate) => api.post<Task>("/tasks", data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: (task) => {
+      qc.invalidateQueries({ queryKey: ["tasks"] })
+
+      if (task.deadline) {
+        const daysUntil = Math.ceil(
+          (new Date(task.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        )
+        if (daysUntil >= 0 && daysUntil <= 14) {
+          useScheduleStore.getState().setPendingAdjustment({
+            taskId: task.id,
+            taskTitle: task.title,
+            deadline: task.deadline,
+            triggeredAt: Date.now(),
+          })
+        }
+      }
+    },
   })
 }
 

@@ -101,6 +101,46 @@ export interface ScheduleEvent {
   notes: string | null
   ai_suggested: boolean
   created_at: string
+  source?: "calendar" | "template"
+  display_color?: string | null
+}
+
+// Schedule template
+export interface TemplateSlot {
+  id: number
+  user_id: number
+  title: string
+  day_of_week: number
+  start_time: string
+  duration_minutes: number
+  category: "class" | "lab" | "gym" | "extracurricular" | "personal" | "sleep" | "other"
+  course_id: number | null
+  color: string
+  created_at: string
+}
+
+export interface SchedulePreferences {
+  id: number
+  user_id: number
+  wake_time: string
+  sleep_time: string
+  daily_study_hours: number
+  study_block_minutes: number
+  preferred_study_time: "morning" | "afternoon" | "evening" | "any"
+  free_time_minutes: number
+  study_days: string
+  notes: string | null
+  updated_at: string
+}
+
+export interface GeneratedEvent {
+  title: string
+  type: "study" | "assignment" | "exam" | "break" | "other"
+  date: string
+  start_time: string
+  duration: number
+  course_id: number | null
+  is_anchor?: boolean
 }
 
 // Quiz

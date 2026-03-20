@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/api/client"
-import type { ScheduleEvent } from "@/types"
+import type {
+  GeneratedEvent,
+  ScheduleEvent,
+  SchedulePreferences,
+  TemplateSlot,
+} from "@/types"
 
 interface ScheduleSuggestion {
   title: string
@@ -94,6 +99,71 @@ export function useUpdateEvent() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateEventInput }) =>
       api.patch<ScheduleEvent>(`/schedule/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
+  })
+}
+
+export function useTemplateStatus() {
+  return useQuery({
+    queryKey: ["schedule", "template", "status"],
+    queryFn: () => api.get<{ has_template: boolean }>("/schedule/template/status"),
+  })
+}
+
+export function useTemplateSlots() {
+  return useQuery({
+    queryKey: ["schedule", "template", "slots"],
+    queryFn: () => api.get<TemplateSlot[]>("/schedule/template/slots"),
+  })
+}
+
+export function useCreateSlot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Omit<TemplateSlot, "id" | "user_id" | "created_at">) =>
+      api.post<TemplateSlot>("/schedule/template/slots", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule", "template"] }),
+  })
+}
+
+export function useUpdateSlot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<TemplateSlot> }) =>
+      api.patch<TemplateSlot>(`/schedule/template/slots/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule", "template"] }),
+  })
+}
+
+export function useDeleteSlot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/schedule/template/slots/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule", "template"] }),
+  })
+}
+
+export function useSchedulePreferences() {
+  return useQuery({
+    queryKey: ["schedule", "template", "preferences"],
+    queryFn: () => api.get<SchedulePreferences>("/schedule/template/preferences"),
+  })
+}
+
+export function useUpdateSchedulePreferences() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Partial<SchedulePreferences>) =>
+      api.patch<SchedulePreferences>("/schedule/template/preferences", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule", "template"] }),
+  })
+}
+
+export function useApplyWeek() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (events: GeneratedEvent[]) =>
+      api.post<{ created: number }>("/schedule/template/apply", { events }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
   })
 }
