@@ -1,5 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 from pathlib import Path
+
+# Find Visual C++ runtime DLLs from the Python installation
+python_dir = Path(sys.executable).parent
+vc_dlls = []
+for dll_name in ["vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"]:
+    dll_path = python_dir / dll_name
+    if dll_path.exists():
+        vc_dlls.append((str(dll_path), "."))
+
 
 block_cipher = None
 
@@ -35,7 +45,7 @@ hiddenimports = [
 a = Analysis(
     ["sidecar/main.py"],
     pathex=[str(Path(".").resolve())],
-    binaries=[],
+    binaries=vc_dlls,
     datas=[
         ("alembic", "alembic"),
         ("alembic.ini", "."),
