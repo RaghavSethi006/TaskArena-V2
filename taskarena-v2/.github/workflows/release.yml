@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Compile Python backend
+        run: pyinstaller taskarena-backend.spec --clean --noconfirm
+
+      - name: Copy backend to Tauri binaries (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $triple = "${{ matrix.target }}"
+          $dest = "frontend/src-tauri/binaries/taskarena-backend-$triple"
+          if (Test-Path $dest) {
+            Remove-Item $dest -Recurse -Force
+          }
+          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+          Copy-Item "dist/taskarena-backend" $dest -Recurse -Force
+
+      - name: Copy backend to Tauri binaries (Mac/Linux)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          DEST="frontend/src-tauri/binaries/taskarena-backend-${{ matrix.target }}"
+          rm -rf "$DEST"
+          mkdir -p "$(dirname "$DEST")"
+          cp -r dist/taskarena-backend "$DEST"
+          chmod -R +x "$DEST"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: frontend
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: frontend
+          tagName: ${{ github.ref_name }}
+          releaseName: "TaskArena ${{ github.ref_name }}"
+          releaseDraft: true
+          args: --target ${{ matrix.target }}
+          releaseBody: |
+            ## TaskArena ${{ github.ref_name }}
+
+            ### Download
+            | Platform | File |
+            |---|---|
+            | Windows | `TaskArena_*_x64-setup.exe` |
+            | Mac (Intel) | `TaskArena_*_x64.dmg` |
+            | Mac (Apple Silicon) | `TaskArena_*_aarch64.dmg` |
+            | Linux | `TaskArena_*_amd64.AppImage` |
+
+            ### First time setup
+            The app guides you through setup on first launch.
+            Get a free Groq API key at https://console.groq.com/keys
+            (takes 30 seconds, no credit card needed)
