@@ -4,9 +4,17 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to publish, for example v2.0.1"
+        required: true
+        type: string
 
 jobs:
   build:
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || github.ref_name }}
     strategy:
       fail-fast: false
       matrix:
@@ -92,12 +100,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: taskarena-v2/frontend
-          tagName: ${{ github.ref_name }}
-          releaseName: "TaskArena ${{ github.ref_name }}"
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: "TaskArena ${{ env.RELEASE_TAG }}"
           releaseDraft: true
           args: --target ${{ matrix.target }}
           releaseBody: |
-            ## TaskArena ${{ github.ref_name }}
+            ## TaskArena ${{ env.RELEASE_TAG }}
 
             ### Download
             | Platform | File |
