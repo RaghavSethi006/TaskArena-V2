@@ -67,11 +67,11 @@ async function getBackendPort(): Promise<number> {
 }
 
 export async function getBaseApiUrl(): Promise<string> {
+  const port = await getBackendPort()
   if (!isTauriRuntime() && import.meta.env.DEV) {
     return "/api"
   }
 
-  const port = await getBackendPort()
   return `http://127.0.0.1:${port}/api`
 }
 
