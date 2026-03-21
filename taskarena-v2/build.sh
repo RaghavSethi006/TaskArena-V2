@@ -20,7 +20,7 @@ PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 if [[ ! -x "$PYTHON_BIN" ]]; then
   PYTHON_BIN="python"
 fi
-if pyinstaller taskarena-backend.spec --clean --noconfirm || "$PYTHON_BIN" -m PyInstaller taskarena-backend.spec --clean --noconfirm; then
+if pyinstaller taskarena-backend.spec --clean --noconfirm --contents-directory . || "$PYTHON_BIN" -m PyInstaller taskarena-backend.spec --clean --noconfirm --contents-directory .; then
   BACKEND_BUILT=1
 elif [[ -d dist/taskarena-backend ]]; then
   echo "[1/3] PyInstaller could not run here; reusing existing dist/taskarena-backend/" >&2
