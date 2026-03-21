@@ -54,7 +54,7 @@ jobs:
         working-directory: taskarena-v2
 
       - name: Compile Python backend
-        run: pyinstaller taskarena-backend.spec --clean --noconfirm
+        run: pyinstaller taskarena-backend.spec --clean --noconfirm --contents-directory .
         working-directory: taskarena-v2
 
       - name: Copy backend to Tauri binaries (Windows)
