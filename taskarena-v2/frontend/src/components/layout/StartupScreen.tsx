@@ -16,9 +16,9 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
 
   // Show the window once React has mounted (prevents white flash)
   useEffect(() => {
-    const isTauri = "__TAURI__" in window || "__TAURI_INTERNALS__" in window
-    if (!isTauri) return
-    void getCurrentWindow().show()
+    void getCurrentWindow().show().catch(() => {
+      // Ignore browser/dev fallback environments where no native window exists.
+    })
   }, [])
 
   // Animated dots

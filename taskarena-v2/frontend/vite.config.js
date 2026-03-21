@@ -1,16 +1,17 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+const srcDir = fileURLToPath(new URL("./src", import.meta.url));
 
-// https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [react()],
   resolve: {
+    preserveSymlinks: true,
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(srcDir),
     },
   },
 
@@ -41,4 +42,4 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
-}));
+});

@@ -1,85 +1,48 @@
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
+
+use tauri::Manager;
 
 #[tauri::command]
-fn get_backend_port(app: AppHandle) -> u16 {
-    *app.state::<Mutex<u16>>().lock().unwrap()
+fn get_backend_port() -> u16 {
+    8765
 }
 
-// ─── DEV MODE ────────────────────────────────────────────────────────────────
-// In debug builds, assume uvicorn is already running on port 8765.
-// Just inject the port into the window — no binary needed.
-// Run backend separately: uvicorn backend.main:app --port 8765 --reload
-#[cfg(debug_assertions)]
+#[cfg(dev)]
 fn start_backend(app: &mut tauri::App) {
     *app.state::<Mutex<u16>>().lock().unwrap() = 8765;
 
-    // Inject immediately — window may not be ready yet so also set on page load
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.eval("window.__BACKEND_PORT__ = 8765");
     }
 }
 
-// ─── RELEASE MODE ────────────────────────────────────────────────────────────
-// In release builds, spawn the PyInstaller sidecar binary.
-// The sidecar picks a free port, prints "READY port=XXXX", and we inject it.
-#[cfg(not(debug_assertions))]
+#[cfg(not(dev))]
 fn start_backend(app: &mut tauri::App) {
-    use tauri_plugin_shell::process::CommandChild;
-    use tauri_plugin_shell::ShellExt;
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .expect("failed to resolve the Tauri resource directory");
+    let exe_name = format!("taskarena-backend{}", std::env::consts::EXE_SUFFIX);
+    let backend_path = resource_dir.join("backend").join(exe_name);
 
-    struct SidecarState(Mutex<Option<CommandChild>>);
-
-    let handle = app.handle().clone();
-
-    let sidecar_command = app
-        .shell()
-        .sidecar("taskarena-backend")
-        .expect("sidecar binary not found — run PyInstaller first")
-        .args(["--port", "0"]);
-
-    let (mut rx, child) = sidecar_command
+    std::process::Command::new(&backend_path)
         .spawn()
-        .expect("failed to spawn sidecar binary");
-
-    // Store child so Tauri kills it on app exit
-    app.manage(SidecarState(Mutex::new(Some(child))));
-
-    tauri::async_runtime::spawn(async move {
-        use tauri_plugin_shell::process::CommandEvent;
-
-        while let Some(event) = rx.recv().await {
-            if let CommandEvent::Stdout(line_bytes) = event {
-                let line = String::from_utf8_lossy(&line_bytes);
-                if let Some(raw_port) = line.trim().strip_prefix("READY port=") {
-                    if let Ok(port) = raw_port.parse::<u16>() {
-                        *handle.state::<Mutex<u16>>().lock().unwrap() = port;
-
-                        if let Some(window) = handle.get_webview_window("main") {
-                            let _ = window.eval(&format!(
-                                "window.__BACKEND_PORT__ = {}",
-                                port
-                            ));
-                        }
-
-                        println!("Backend sidecar ready on port {}", port);
-                    }
-                }
-            }
-        }
-    });
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to launch bundled backend at {}: {error}",
+                backend_path.display()
+            )
+        });
 }
 
-// ─── ENTRY POINT ─────────────────────────────────────────────────────────────
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(0u16))
-        // Re-inject port on every page load (handles hot reloads in dev)
         .on_page_load(|window, _| {
             let port = *window.state::<Mutex<u16>>().lock().unwrap();
             if port > 0 {

@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:backend": "node start-backend.cjs",
     "dev:all": "concurrently -n backend,vite -c blue,green \"npm run dev:backend\" \"npm run dev\"",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --configLoader runner",
     "preview": "vite preview",
     "tauri": "tauri"
   },

@@ -348,6 +348,12 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
   const [newInviteOnly, setNewInviteOnly] = useState(false)
   const [joinCode, setJoinCode] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
+  const [confirm, setConfirm] = useState<{
+    title: string
+    description: string
+    confirmLabel: string
+    onConfirm: () => void
+  } | null>(null)
 
   // Sync local stats to Firebase so lobby mates see up-to-date numbers
   useEffect(() => {
@@ -404,7 +410,7 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
     setConfirm({
       title: isOwner ? "Disband Lobby" : "Leave Lobby",
       description: isOwner
-        ? "This will permanently delete the lobby and remove all members."
+        ? "Disbanding will remove all members. This cannot be undone."
         : "You will be removed from this lobby.",
       confirmLabel: isOwner ? "Disband" : "Leave",
       onConfirm: async () => {
@@ -424,8 +430,7 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
     })
   }
 
-  const handleKick = async (targetUid: string, name: string) => {
-    if (!activeLobbyId) return
+  const handleKick = (targetUid: string, name: string) => {
     setConfirm({
       title: "Remove Member",
       description: `${name} will be removed from the lobby.`,
@@ -433,7 +438,7 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
       onConfirm: async () => {
         setConfirm(null)
         try {
-          await kickMember(activeLobbyId, targetUid, uid)
+          await kickMember(activeLobbyId!, targetUid, uid)
           toast.success(`${name} was removed`)
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "Failed")
@@ -754,7 +759,17 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
             />
           )}
         </DialogContent>
-      </Dialog>    </div>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ""}
+        description={confirm?.description ?? ""}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        onConfirm={() => confirm?.onConfirm()}
+        onCancel={() => setConfirm(null)}
+      />
+    </div>
   )
 }
 
@@ -763,12 +778,6 @@ function LobbiesView({ uid, displayName, meStats }: { uid: string; displayName: 
 export default function LeaderboardPage() {
   const [period, setPeriod] = useState<"alltime" | "weekly">("alltime")
   const [mainTab, setMainTab] = useState<MainTab>("alltime")
-  const [confirm, setConfirm] = useState<{
-    title: string
-    description: string
-    confirmLabel: string
-    onConfirm: () => void
-  } | null>(null)
 
   const rankingsQuery = useQuery({
     queryKey: ["leaderboard", period],
@@ -900,15 +909,6 @@ export default function LeaderboardPage() {
           />
         )
       )}
-
-      <ConfirmDialog
-        open={confirm !== null}
-        title={confirm?.title ?? ""}
-        description={confirm?.description ?? ""}
-        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
-        onConfirm={() => confirm?.onConfirm()}
-        onCancel={() => setConfirm(null)}
-      />
     </div>
   )
 }
