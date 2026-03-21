@@ -32,31 +32,35 @@ jobs:
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt pyinstaller
+        working-directory: taskarena-v2
 
       - name: Compile Python backend
         run: pyinstaller taskarena-backend.spec --clean --noconfirm
+        working-directory: taskarena-v2
 
       - name: Copy backend to Tauri binaries (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           $triple = "${{ matrix.target }}"
-          $dest = "taskarena-v2/frontend/src-tauri/binaries/taskarena-backend-$triple"
+          $dest = "frontend/src-tauri/binaries/taskarena-backend-$triple"
           if (Test-Path $dest) {
             Remove-Item $dest -Recurse -Force
           }
           New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
           Copy-Item "dist/taskarena-backend" $dest -Recurse -Force
+        working-directory: taskarena-v2
 
       - name: Copy backend to Tauri binaries (Mac/Linux)
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          DEST="taskarena-v2/frontend/src-tauri/binaries/taskarena-backend-${{ matrix.target }}"
+          DEST="frontend/src-tauri/binaries/taskarena-backend-${{ matrix.target }}"
           rm -rf "$DEST"
           mkdir -p "$(dirname "$DEST")"
           cp -r dist/taskarena-backend "$DEST"
           chmod -R +x "$DEST"
+        working-directory: taskarena-v2
 
       - uses: actions/setup-node@v4
         with:
