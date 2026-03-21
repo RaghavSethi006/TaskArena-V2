@@ -21,13 +21,13 @@ try {
     Write-Host "`n[1/3] Compiling Python backend..." -ForegroundColor Yellow
     $backendDist = Join-Path $projectRoot "dist/taskarena-backend"
     $backendBuilt = $false
-    pyinstaller taskarena-backend.spec --clean --noconfirm --contents-directory .
+    pyinstaller taskarena-backend.spec --clean --noconfirm
     if ($LASTEXITCODE -ne 0) {
         $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
         if (Test-Path $venvPython) {
-            & $venvPython -m PyInstaller taskarena-backend.spec --clean --noconfirm --contents-directory .
+            & $venvPython -m PyInstaller taskarena-backend.spec --clean --noconfirm
         } else {
-            python -m PyInstaller taskarena-backend.spec --clean --noconfirm --contents-directory .
+            python -m PyInstaller taskarena-backend.spec --clean --noconfirm
         }
     }
     if ($LASTEXITCODE -ne 0) {
