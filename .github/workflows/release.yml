@@ -27,6 +27,7 @@ jobs:
             target: aarch64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            bundles: "deb rpm"
 
     runs-on: ${{ matrix.os }}
 
@@ -37,17 +38,19 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-      - name: Install macOS build dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          brew install cmake
+      - name: Install Python dependencies (Windows - includes local model)
+        if: matrix.os == 'windows-latest'
+        run: pip install -r requirements.txt pyinstaller
         working-directory: taskarena-v2
 
-      - name: Install Python dependencies
-        env:
-          CMAKE_ARGS: "-DLLAMA_METAL=OFF"
-          FORCE_CMAKE: "1"
-        run: pip install -r requirements.txt pyinstaller
+      - name: Install macOS build dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: brew install cmake
+        working-directory: taskarena-v2
+
+      - name: Install Python dependencies (Mac/Linux - Ollama for local models)
+        if: matrix.os != 'windows-latest'
+        run: pip install -r requirements-ci.txt pyinstaller
         working-directory: taskarena-v2
 
       - name: Compile Python backend
@@ -113,7 +116,9 @@ jobs:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: "TaskArena ${{ env.RELEASE_TAG }}"
           releaseDraft: true
-          args: --target ${{ matrix.target }}
+          args: >-
+            --target ${{ matrix.target }}
+            ${{ matrix.bundles && format('--bundles {0}', matrix.bundles) || '' }}
           releaseBody: |
             ## TaskArena ${{ env.RELEASE_TAG }}
 
