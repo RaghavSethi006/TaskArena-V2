@@ -161,9 +161,53 @@ jobs:
             | Windows | `TaskArena_*_x64-setup.exe` |
             | Mac (Intel) | `TaskArena_*_x64.dmg` |
             | Mac (Apple Silicon) | `TaskArena_*_aarch64.dmg` |
+            | Mac (Alternative zip) | `TaskArena-<tag>-x64.zip` or `TaskArena-<tag>-aarch64.zip` |
             | Linux (Ubuntu/Debian) | `TaskArena_*_amd64.deb` |
             | Linux (Fedora) | `TaskArena_*_x86_64.rpm` |
 
             ### First time setup
             The app guides you through setup on first launch.
             Get a free Groq API key at https://console.groq.com/keys
+
+            ### Mac Installation (unsigned)
+            1. Download the `.zip` file for your Mac.
+            2. Double-click to extract `TaskArena.app`.
+            3. Right-click `TaskArena.app` and choose `Open`.
+            4. Click `Open` on the security warning.
+            5. The app should open normally after that.
+
+      - name: Create Mac zip (alternative to DMG for unsigned apps)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          APP_DIR="taskarena-v2/frontend/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+          APP_PATH="$APP_DIR/TaskArena.app"
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+
+          case "${{ matrix.target }}" in
+            aarch64-apple-darwin) ARCH_SUFFIX="aarch64" ;;
+            x86_64-apple-darwin) ARCH_SUFFIX="x64" ;;
+            *) ARCH_SUFFIX="${{ matrix.target }}" ;;
+          esac
+
+          ZIP_NAME="TaskArena-${TAG}-${ARCH_SUFFIX}.zip"
+
+          if [ -d "$APP_PATH" ]; then
+            cd "$APP_DIR"
+            rm -f "$ZIP_NAME"
+            ditto -c -k --sequesterRsrc --keepParent "TaskArena.app" "$ZIP_NAME"
+            echo "Zip created at: $APP_DIR/$ZIP_NAME"
+          else
+            echo "App bundle not found, skipping zip"
+          fi
+
+      - name: Upload Mac zip to release
+        if: matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          draft: true
+          files: |
+            taskarena-v2/frontend/src-tauri/target/${{ matrix.target }}/release/bundle/macos/TaskArena-${{ github.event.inputs.tag || github.ref_name }}-*.zip
