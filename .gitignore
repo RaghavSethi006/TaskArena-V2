@@ -30,6 +30,7 @@ taskarena-v2/frontend/node_modules/
 taskarena-v2/frontend/dist/
 taskarena-v2/frontend/.tauri/
 taskarena-v2/frontend/src-tauri/target/
+taskarena-v2/frontend/src-tauri/binaries/backend-bundle/
 taskarena-v2/frontend/src-tauri/binaries/taskarena-backend-*.exe
 taskarena-v2/frontend/src-tauri/binaries/taskarena-backend-*/
 

@@ -20,19 +20,44 @@ fn start_backend(app: &mut tauri::App) {
 
 #[cfg(not(dev))]
 fn start_backend(app: &mut tauri::App) {
+    use std::process::Command;
+
     let resource_dir = app
         .path()
         .resource_dir()
         .expect("failed to resolve the Tauri resource directory");
-    let exe_name = format!("taskarena-backend{}", std::env::consts::EXE_SUFFIX);
-    let backend_path = resource_dir.join("backend").join(exe_name);
+    let backend_dir = resource_dir.join("backend");
+    let python_exe = backend_dir.join("python.exe");
 
-    std::process::Command::new(&backend_path)
+    if python_exe.exists() {
+        let sidecar_main = backend_dir.join("sidecar").join("main.py");
+        Command::new(&python_exe)
+            .arg(&sidecar_main)
+            .arg("--port")
+            .arg("8765")
+            .current_dir(&backend_dir)
+            .spawn()
+            .unwrap_or_else(|error| {
+                panic!(
+                    "failed to launch bundled Python backend at {}: {error}",
+                    python_exe.display()
+                )
+            });
+        return;
+    }
+
+    let exe_name = format!("taskarena-backend{}", std::env::consts::EXE_SUFFIX);
+    let backend_exe = backend_dir.join(exe_name);
+
+    Command::new(&backend_exe)
+        .arg("--port")
+        .arg("8765")
+        .current_dir(&backend_dir)
         .spawn()
         .unwrap_or_else(|error| {
             panic!(
                 "failed to launch bundled backend at {}: {error}",
-                backend_path.display()
+                backend_exe.display()
             )
         });
 }
