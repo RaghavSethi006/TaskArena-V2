@@ -93,7 +93,9 @@ jobs:
           Remove-Item "get-pip.py"
 
           Write-Host "Installing Python packages..."
-          & "$embedDir\python.exe" -m pip install -r requirements.txt --no-warn-script-location --quiet
+          # The embeddable runtime can consume wheels reliably, but native source builds
+          # like llama-cpp-python are not suitable for this release packaging path.
+          & "$embedDir\python.exe" -m pip install -r requirements-ci.txt --no-warn-script-location --quiet
           if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
           New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
