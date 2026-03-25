@@ -1,86 +1,79 @@
-$projectRoot = $PSScriptRoot
-$exitCode = 0
+$ErrorActionPreference = "Stop"
+$StartDir = Get-Location
 
-function Test-TauriCliInstalled {
-    return (
-        $null -ne (Get-Command cargo-tauri -ErrorAction SilentlyContinue) -or
-        $null -ne (Get-Command cargo-tauri.exe -ErrorAction SilentlyContinue)
-    )
-}
+Write-Host "TaskArena Build Script (Windows)" -ForegroundColor Cyan
+Write-Host "================================`n"
 
 try {
-    Set-Location $projectRoot
+    Set-Location $PSScriptRoot
 
-    $activateScript = Join-Path $projectRoot ".venv\Scripts\Activate.ps1"
-    if (-not $env:VIRTUAL_ENV -and (Test-Path $activateScript)) {
-        . $activateScript
-    }
+    Write-Host "[1/4] Downloading Python 3.10.11 embeddable..." -ForegroundColor Yellow
 
-    Write-Host "Building TaskArena..." -ForegroundColor Cyan
+    $pythonVersion = "3.10.11"
+    $embedUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip"
+    $embedZip = "python-embed.zip"
+    $embedDir = "python-embed"
 
-    Write-Host "`n[1/3] Compiling Python backend..." -ForegroundColor Yellow
-    $backendDist = Join-Path $projectRoot "dist/taskarena-backend"
-    $backendBuilt = $false
-    pyinstaller taskarena-backend.spec --clean --noconfirm
-    if ($LASTEXITCODE -ne 0) {
-        $venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
-        if (Test-Path $venvPython) {
-            & $venvPython -m PyInstaller taskarena-backend.spec --clean --noconfirm
-        } else {
-            python -m PyInstaller taskarena-backend.spec --clean --noconfirm
-        }
-    }
-    if ($LASTEXITCODE -ne 0) {
-        if (Test-Path $backendDist) {
-            Write-Host "[1/3] PyInstaller could not run here; reusing existing dist/taskarena-backend/" -ForegroundColor Yellow
-        } else {
-            throw "Backend build failed and dist/taskarena-backend does not exist"
-        }
-    } else {
-        $backendBuilt = $true
-    }
+    if (Test-Path $embedDir) { Remove-Item $embedDir -Recurse -Force }
+    if (Test-Path $embedZip) { Remove-Item $embedZip -Force }
 
-    $triple = (rustc -Vv | Select-String "host:").ToString().Split(" ")[1].Trim()
-    $dest = Join-Path $projectRoot "frontend/src-tauri/binaries/taskarena-backend-$triple"
-    if (Test-Path $dest) {
-        Remove-Item $dest -Recurse -Force
-    }
-    New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-    Copy-Item $backendDist $dest -Recurse -Force
-    if ($backendBuilt) {
-        Write-Host "[1/3] Backend compiled -> dist/taskarena-backend/" -ForegroundColor Green
-    } else {
-        Write-Host "[1/3] Backend ready -> dist/taskarena-backend/" -ForegroundColor Green
-    }
+    Invoke-WebRequest -Uri $embedUrl -OutFile $embedZip -UseBasicParsing
+    Expand-Archive $embedZip -DestinationPath $embedDir -Force
+    Remove-Item $embedZip
 
-    Set-Location (Join-Path $projectRoot "frontend")
+    $pthFile = Get-ChildItem "$embedDir\python*._pth" | Select-Object -First 1
+    if (-not $pthFile) { throw "Could not find ._pth file in embeddable Python" }
 
-    if (-not (Test-TauriCliInstalled)) {
-        Write-Host "Run: cargo install tauri-cli --version '^2' then re-run build.ps1" -ForegroundColor Red
-        $exitCode = 1
-    } else {
-        Write-Host "`n[2/3] Installing frontend dependencies..." -ForegroundColor Yellow
-        npm install
-        if ($LASTEXITCODE -ne 0) {
-            throw "Frontend dependency installation failed"
-        }
-        Write-Host "[2/3] Frontend deps installed" -ForegroundColor Green
+    $pthContent = Get-Content $pthFile.FullName
+    $pthContent = $pthContent | ForEach-Object {
+        if ($_ -match "^#import site") { "import site" } else { $_ }
+    }
+    if ($pthContent -notcontains ".") { $pthContent += "." }
+    Set-Content $pthFile.FullName ($pthContent -join "`n") -NoNewline
 
-        Write-Host "`n[3/3] Building Tauri installer..." -ForegroundColor Yellow
-        cargo tauri build
-        if ($LASTEXITCODE -ne 0) {
-            throw "Tauri build failed"
-        }
-        Write-Host "[3/3] Tauri installer built -> frontend/src-tauri/target/release/bundle/" -ForegroundColor Green
-        Write-Host "Done! Installer at: frontend/src-tauri/target/release/bundle/nsis/*.exe" -ForegroundColor Green
-    }
-} catch {
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    if ($exitCode -eq 0) {
-        $exitCode = 1
-    }
+    Write-Host "Python embeddable ready.`n" -ForegroundColor Green
+
+    Write-Host "[2/4] Installing pip and Python packages..." -ForegroundColor Yellow
+
+    $pythonExe = Resolve-Path "$embedDir\python.exe"
+    Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile "get-pip.py" -UseBasicParsing
+    & $pythonExe "get-pip.py" --no-warn-script-location --quiet
+    Remove-Item "get-pip.py"
+
+    & $pythonExe -m pip install -r requirements.txt --no-warn-script-location --quiet
+    if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+
+    Write-Host "Packages installed.`n" -ForegroundColor Green
+
+    Write-Host "[3/4] Building backend bundle..." -ForegroundColor Yellow
+
+    $bundleDir = "frontend\src-tauri\binaries\backend-bundle"
+    if (Test-Path $bundleDir) { Remove-Item $bundleDir -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
+
+    Copy-Item "$embedDir\*" $bundleDir -Recurse -Force
+    Copy-Item "sidecar" "$bundleDir\sidecar" -Recurse -Force
+    Copy-Item "backend" "$bundleDir\backend" -Recurse -Force
+    Copy-Item "features" "$bundleDir\features" -Recurse -Force
+    Copy-Item "shared" "$bundleDir\shared" -Recurse -Force
+    Copy-Item "alembic" "$bundleDir\alembic" -Recurse -Force
+    Copy-Item "alembic.ini" "$bundleDir\alembic.ini" -Force
+    Copy-Item ".env.example" "$bundleDir\.env" -Force
+
+    Get-ChildItem $bundleDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem $bundleDir -Recurse -File -Filter "*.pyc" | Remove-Item -Force -ErrorAction SilentlyContinue
+
+    Write-Host "Bundle ready at: $bundleDir`n" -ForegroundColor Green
+
+    Write-Host "[4/4] Building Tauri installer..." -ForegroundColor Yellow
+
+    Set-Location frontend
+    npm install --quiet
+    cargo tauri build
+    if ($LASTEXITCODE -ne 0) { throw "Tauri build failed" }
+
+    Write-Host "`nDone! Installer at:" -ForegroundColor Green
+    Write-Host "  src-tauri\target\release\bundle\nsis\*.exe" -ForegroundColor Cyan
 } finally {
-    Set-Location $projectRoot
+    Set-Location $StartDir
 }
-
-exit $exitCode

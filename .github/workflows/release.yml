@@ -6,15 +6,13 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: "Release tag to publish, for example v2.0.1"
+      tag:
+        description: "Release tag (e.g. v2.0.8)"
         required: true
-        type: string
+        default: "v2.0.8"
 
 jobs:
   build:
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || github.ref_name }}
     strategy:
       fail-fast: false
       matrix:
@@ -22,9 +20,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
           - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
             target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             bundles: "deb rpm"
@@ -32,70 +30,104 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        if: matrix.os != 'windows-latest'
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-      - name: Install Python dependencies (Windows - includes local model)
-        if: matrix.os == 'windows-latest'
-        run: pip install -r requirements.txt pyinstaller
-        working-directory: taskarena-v2
 
       - name: Install macOS build dependencies
-        if: startsWith(matrix.os, 'macos')
+        if: matrix.os == 'macos-latest'
         run: brew install cmake
-        working-directory: taskarena-v2
 
-      - name: Install Python dependencies (Mac/Linux - Ollama for local models)
+      - name: Install Python dependencies (Mac/Linux)
         if: matrix.os != 'windows-latest'
         run: pip install -r requirements-ci.txt pyinstaller
         working-directory: taskarena-v2
 
-      - name: Compile Python backend
-        run: pyinstaller taskarena-backend.spec --clean --noconfirm
+      - name: Compile Python backend with PyInstaller (Mac/Linux)
+        if: matrix.os != 'windows-latest'
         working-directory: taskarena-v2
+        run: |
+          pyinstaller taskarena-backend.spec --clean --noconfirm
+          BUNDLE_DIR="frontend/src-tauri/binaries/backend-bundle"
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR"
+          cp -r dist/taskarena-backend/. "$BUNDLE_DIR/"
+          chmod +x "$BUNDLE_DIR/taskarena-backend" 2>/dev/null || true
 
-      - name: Copy backend to Tauri binaries (Windows)
+      - name: Build Windows backend (Python embeddable)
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        working-directory: taskarena-v2
         run: |
-          $triple = "${{ matrix.target }}"
-          $dest = "frontend/src-tauri/binaries/taskarena-backend-$triple"
-          if (Test-Path $dest) {
-            Remove-Item $dest -Recurse -Force
+          $pythonVersion = "3.10.11"
+          $embedUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip"
+          $embedDir = "python-embed"
+          $bundleDir = "frontend\src-tauri\binaries\backend-bundle"
+
+          if (Test-Path $embedDir) { Remove-Item $embedDir -Recurse -Force }
+          if (Test-Path $bundleDir) { Remove-Item $bundleDir -Recurse -Force }
+
+          Write-Host "Downloading Python $pythonVersion embeddable..."
+          Invoke-WebRequest -Uri $embedUrl -OutFile "python-embed.zip" -UseBasicParsing
+          Expand-Archive "python-embed.zip" -DestinationPath $embedDir -Force
+          Remove-Item "python-embed.zip"
+
+          $pthFile = Get-ChildItem "$embedDir\python*._pth" | Select-Object -First 1
+          if (-not $pthFile) { throw "Could not find ._pth file in embeddable Python" }
+
+          $pthContent = Get-Content $pthFile.FullName
+          $pthContent = $pthContent | ForEach-Object {
+            if ($_ -match "^#import site") { "import site" } else { $_ }
           }
-          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-          Copy-Item "dist/taskarena-backend" $dest -Recurse -Force
-        working-directory: taskarena-v2
+          if ($pthContent -notcontains ".") { $pthContent += "." }
+          Set-Content $pthFile.FullName ($pthContent -join "`n") -NoNewline
 
-      - name: Copy backend to Tauri binaries (Mac/Linux)
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          DEST="frontend/src-tauri/binaries/taskarena-backend-${{ matrix.target }}"
-          rm -rf "$DEST"
-          mkdir -p "$(dirname "$DEST")"
-          cp -r dist/taskarena-backend "$DEST"
-          chmod -R +x "$DEST"
-        working-directory: taskarena-v2
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile "get-pip.py" -UseBasicParsing
+          & "$embedDir\python.exe" "get-pip.py" --no-warn-script-location --quiet
+          Remove-Item "get-pip.py"
 
-      - uses: actions/setup-node@v4
+          Write-Host "Installing Python packages..."
+          & "$embedDir\python.exe" -m pip install -r requirements.txt --no-warn-script-location --quiet
+          if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+
+          New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
+          Copy-Item "$embedDir\*" $bundleDir -Recurse -Force
+          Copy-Item "sidecar" "$bundleDir\sidecar" -Recurse -Force
+          Copy-Item "backend" "$bundleDir\backend" -Recurse -Force
+          Copy-Item "features" "$bundleDir\features" -Recurse -Force
+          Copy-Item "shared" "$bundleDir\shared" -Recurse -Force
+          Copy-Item "alembic" "$bundleDir\alembic" -Recurse -Force
+          Copy-Item "alembic.ini" "$bundleDir\alembic.ini" -Force
+          Copy-Item ".env.example" "$bundleDir\.env" -Force
+
+          Get-ChildItem $bundleDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem $bundleDir -Recurse -File -Filter "*.pyc" | Remove-Item -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Windows bundle ready."
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: taskarena-v2/frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm install
         working-directory: taskarena-v2/frontend
+        run: npm install
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Linux dependencies
+      - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
@@ -113,14 +145,15 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         with:
           projectPath: taskarena-v2/frontend
-          tagName: ${{ env.RELEASE_TAG }}
-          releaseName: "TaskArena ${{ env.RELEASE_TAG }}"
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: "TaskArena ${{ github.event.inputs.tag || github.ref_name }}"
           releaseDraft: true
+          prerelease: false
           args: >-
             --target ${{ matrix.target }}
             ${{ matrix.bundles && format('--bundles {0}', matrix.bundles) || '' }}
           releaseBody: |
-            ## TaskArena ${{ env.RELEASE_TAG }}
+            ## TaskArena ${{ github.event.inputs.tag || github.ref_name }}
 
             ### Download
             | Platform | File |
@@ -128,9 +161,9 @@ jobs:
             | Windows | `TaskArena_*_x64-setup.exe` |
             | Mac (Intel) | `TaskArena_*_x64.dmg` |
             | Mac (Apple Silicon) | `TaskArena_*_aarch64.dmg` |
-            | Linux | `TaskArena_*_amd64.AppImage` |
+            | Linux (Ubuntu/Debian) | `TaskArena_*_amd64.deb` |
+            | Linux (Fedora) | `TaskArena_*_x86_64.rpm` |
 
             ### First time setup
             The app guides you through setup on first launch.
             Get a free Groq API key at https://console.groq.com/keys
-            (takes 30 seconds, no credit card needed)
