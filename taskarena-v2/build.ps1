@@ -40,7 +40,9 @@ try {
     & $pythonExe "get-pip.py" --no-warn-script-location --quiet
     Remove-Item "get-pip.py"
 
-    & $pythonExe -m pip install -r requirements.txt --no-warn-script-location --quiet
+    # The embeddable runtime can consume wheels reliably, but native source builds
+    # like llama-cpp-python are not suitable for this release packaging path.
+    & $pythonExe -m pip install -r requirements-ci.txt --no-warn-script-location --quiet
     if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
 
     Write-Host "Packages installed.`n" -ForegroundColor Green
