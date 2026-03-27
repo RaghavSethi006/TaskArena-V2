@@ -44,7 +44,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "binaries/backend-bundle/**/*": "backend/"
+      "binaries/taskarena-backend-*/**/*": "backend/"
     }
   }
 }
