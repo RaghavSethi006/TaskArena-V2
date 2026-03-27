@@ -12,6 +12,7 @@ try {
     $embedZip = Join-Path $PSScriptRoot "python-embed.zip"
     $embedDir = Join-Path $PSScriptRoot "python-embed"
     $bundleDir = Join-Path $PSScriptRoot "frontend\src-tauri\binaries\backend-bundle"
+    $bundleZip = Join-Path $PSScriptRoot "frontend\src-tauri\binaries\backend-bundle.zip"
     $sitePackagesDir = Join-Path $embedDir "Lib\site-packages"
     $pythonExe = Join-Path $embedDir "python.exe"
 
@@ -72,6 +73,9 @@ try {
     if (Test-Path $bundleDir) {
         Remove-Item $bundleDir -Recurse -Force
     }
+    if (Test-Path $bundleZip) {
+        Remove-Item $bundleZip -Force
+    }
     New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
 
     Copy-Item (Join-Path $embedDir "*") $bundleDir -Recurse -Force
@@ -88,7 +92,10 @@ try {
     Get-ChildItem $bundleDir -Recurse -File -Filter "*.pyc" |
         Remove-Item -Force -ErrorAction SilentlyContinue
 
-    Write-Host "Backend bundle ready at: $bundleDir`n" -ForegroundColor Green
+    Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $bundleZip -Force
+
+    Write-Host "Backend bundle ready at: $bundleDir" -ForegroundColor Green
+    Write-Host "Backend archive ready at: $bundleZip`n" -ForegroundColor Green
 
     Write-Host "[4/4] Building Tauri installer..." -ForegroundColor Yellow
 

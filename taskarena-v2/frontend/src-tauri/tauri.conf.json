@@ -44,7 +44,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "binaries/backend-bundle/": "backend/"
+      "binaries/backend-bundle.zip": "backend/backend-bundle.zip"
     }
   }
 }

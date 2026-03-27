@@ -45,6 +45,7 @@ jobs:
           $embedZip = "python-embed.zip"
           $embedDir = "python-embed"
           $bundleDir = "frontend\src-tauri\binaries\backend-bundle"
+          $bundleZip = "frontend\src-tauri\binaries\backend-bundle.zip"
           $sitePackagesDir = Join-Path $embedDir "Lib\site-packages"
 
           if (Test-Path $embedDir) {
@@ -52,6 +53,9 @@ jobs:
           }
           if (Test-Path $bundleDir) {
             Remove-Item $bundleDir -Recurse -Force
+          }
+          if (Test-Path $bundleZip) {
+            Remove-Item $bundleZip -Force
           }
           if (Test-Path $embedZip) {
             Remove-Item $embedZip -Force
@@ -107,6 +111,7 @@ jobs:
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           Get-ChildItem $bundleDir -Recurse -File -Filter "*.pyc" |
             Remove-Item -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$bundleDir\*" -DestinationPath $bundleZip -Force
 
       - name: Set up Python
         if: matrix.os != 'windows-latest'
@@ -131,10 +136,13 @@ jobs:
         run: |
           pyinstaller taskarena-backend.spec --clean --noconfirm
           BUNDLE_DIR="frontend/src-tauri/binaries/backend-bundle"
+          BUNDLE_ZIP="frontend/src-tauri/binaries/backend-bundle.zip"
           rm -rf "$BUNDLE_DIR"
           mkdir -p "$BUNDLE_DIR"
+          rm -f "$BUNDLE_ZIP"
           cp -r dist/taskarena-backend/. "$BUNDLE_DIR/"
           chmod +x "$BUNDLE_DIR/taskarena-backend" 2>/dev/null || true
+          (cd "$BUNDLE_DIR" && zip -r "$PWD/../backend-bundle.zip" .)
 
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-22.04'
