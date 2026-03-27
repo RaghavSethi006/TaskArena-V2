@@ -1,13 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+START_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+trap 'cd "$START_DIR"' EXIT
+
 echo "TaskArena Build Script (Mac/Linux)"
 echo "==================================="
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo ""
+echo
 echo "[1/3] Compiling Python backend with PyInstaller..."
 pyinstaller taskarena-backend.spec --clean --noconfirm
 
@@ -20,14 +23,14 @@ chmod +x "$BUNDLE_DIR/taskarena-backend" 2>/dev/null || true
 
 echo "Backend bundle ready at: $BUNDLE_DIR"
 
-echo ""
+echo
 echo "[2/3] Installing frontend dependencies..."
 cd frontend
 npm install
 
-echo ""
+echo
 echo "[3/3] Building Tauri installer..."
 cargo tauri build
 
-echo ""
+echo
 echo "Done! Installer at: src-tauri/target/release/bundle/"

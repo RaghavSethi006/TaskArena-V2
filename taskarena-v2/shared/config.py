@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -7,12 +8,31 @@ from pydantic_settings import BaseSettings
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
 
-if getattr(sys, "frozen", False):
+
+def _env_path(name: str) -> Path | None:
+    raw_value = os.getenv(name)
+    if not raw_value:
+        return None
+    return Path(raw_value).resolve()
+
+
+ENV_RUNTIME_ROOT = _env_path("TASKARENA_RUNTIME_DIR")
+ENV_RESOURCE_ROOT = _env_path("TASKARENA_RESOURCE_DIR")
+
+if ENV_RUNTIME_ROOT is not None:
+    RUNTIME_ROOT = ENV_RUNTIME_ROOT
+    RESOURCE_ROOT = ENV_RESOURCE_ROOT or ENV_RUNTIME_ROOT
+elif getattr(sys, "frozen", False):
     RUNTIME_ROOT = Path(sys.executable).resolve().parent
     RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", RUNTIME_ROOT))
 else:
     RUNTIME_ROOT = SOURCE_ROOT
     RESOURCE_ROOT = SOURCE_ROOT
+
+ENV_FILES = [str(RUNTIME_ROOT / ".env")]
+RESOURCE_ENV_FILE = RESOURCE_ROOT / ".env"
+if RESOURCE_ENV_FILE != RUNTIME_ROOT / ".env":
+    ENV_FILES.append(str(RESOURCE_ENV_FILE))
 
 
 class Settings(BaseSettings):
@@ -66,7 +86,7 @@ class Settings(BaseSettings):
         return RESOURCE_ROOT
 
     model_config = {
-        "env_file": str(RUNTIME_ROOT / ".env"),
+        "env_file": ENV_FILES,
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

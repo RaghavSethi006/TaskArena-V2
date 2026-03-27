@@ -4,38 +4,91 @@ use std::time::Duration;
 
 use tauri::Manager;
 
+const BACKEND_PORT: u16 = 8765;
+
 #[tauri::command]
 fn get_backend_port() -> u16 {
-    8765
+    BACKEND_PORT
+}
+
+fn set_backend_port(app: &tauri::App, port: u16) {
+    *app.state::<Mutex<u16>>().lock().unwrap() = port;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval(&format!("window.__BACKEND_PORT__ = {}", port));
+    }
 }
 
 #[cfg(dev)]
 fn start_backend(app: &mut tauri::App) {
-    *app.state::<Mutex<u16>>().lock().unwrap() = 8765;
-
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.eval("window.__BACKEND_PORT__ = 8765");
-    }
+    set_backend_port(app, BACKEND_PORT);
 }
 
 #[cfg(not(dev))]
 fn start_backend(app: &mut tauri::App) {
-    use std::process::Command;
+    use std::fs::{self, OpenOptions};
+    use std::path::Path;
+    use std::process::{Command, Stdio};
+
+    fn open_log_file(path: &Path) -> std::fs::File {
+        OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap_or_else(|error| {
+                panic!(
+                    "failed to open backend log file at {}: {error}",
+                    path.display()
+                )
+            })
+    }
+
+    set_backend_port(app, BACKEND_PORT);
 
     let resource_dir = app
         .path()
         .resource_dir()
         .expect("failed to resolve the Tauri resource directory");
     let backend_dir = resource_dir.join("backend");
+    let runtime_dir = app
+        .path()
+        .app_local_data_dir()
+        .expect("failed to resolve the local app data directory")
+        .join("backend");
+
+    fs::create_dir_all(&runtime_dir).unwrap_or_else(|error| {
+        panic!(
+            "failed to create backend runtime directory at {}: {error}",
+            runtime_dir.display()
+        )
+    });
+
+    if !backend_dir.exists() {
+        panic!(
+            "bundled backend resources were not found at {}",
+            backend_dir.display()
+        );
+    }
+
+    let log_path = runtime_dir.join("backend.log");
+    let log_file = open_log_file(&log_path);
     let python_exe = backend_dir.join("python.exe");
 
     if python_exe.exists() {
-        let sidecar_main = backend_dir.join("sidecar").join("main.py");
         Command::new(&python_exe)
-            .arg(&sidecar_main)
+            .arg("sidecar/main.py")
             .arg("--port")
-            .arg("8765")
+            .arg(BACKEND_PORT.to_string())
             .current_dir(&backend_dir)
+            .env("TASKARENA_RUNTIME_DIR", &runtime_dir)
+            .env("TASKARENA_RESOURCE_DIR", &backend_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(
+                log_file
+                    .try_clone()
+                    .expect("failed to clone backend log handle"),
+            ))
+            .stderr(Stdio::from(log_file))
             .spawn()
             .unwrap_or_else(|error| {
                 panic!(
@@ -46,13 +99,27 @@ fn start_backend(app: &mut tauri::App) {
         return;
     }
 
-    let exe_name = format!("taskarena-backend{}", std::env::consts::EXE_SUFFIX);
-    let backend_exe = backend_dir.join(exe_name);
+    let backend_exe_name = if cfg!(target_os = "windows") {
+        "taskarena-backend.exe"
+    } else {
+        "taskarena-backend"
+    };
+    let backend_exe = backend_dir.join(backend_exe_name);
+    let log_file = open_log_file(&log_path);
 
     Command::new(&backend_exe)
         .arg("--port")
-        .arg("8765")
+        .arg(BACKEND_PORT.to_string())
         .current_dir(&backend_dir)
+        .env("TASKARENA_RUNTIME_DIR", &runtime_dir)
+        .env("TASKARENA_RESOURCE_DIR", &backend_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(
+            log_file
+                .try_clone()
+                .expect("failed to clone backend log handle"),
+        ))
+        .stderr(Stdio::from(log_file))
         .spawn()
         .unwrap_or_else(|error| {
             panic!(
