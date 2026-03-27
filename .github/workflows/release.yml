@@ -7,12 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v2.0.8)"
+        description: "Release tag (for example v2.0.8)"
         required: true
-        default: "v2.0.8"
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,82 +26,72 @@ jobs:
             target: x86_64-pc-windows-msvc
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-latest
-            target: x86_64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             bundles: "deb rpm"
-
-    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        if: matrix.os != 'windows-latest'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install macOS build dependencies
-        if: matrix.os == 'macos-latest'
-        run: brew install cmake
-
-      - name: Install Python dependencies (Mac/Linux)
-        if: matrix.os != 'windows-latest'
-        run: pip install -r requirements-ci.txt pyinstaller
-        working-directory: taskarena-v2
-
-      - name: Compile Python backend with PyInstaller (Mac/Linux)
-        if: matrix.os != 'windows-latest'
-        working-directory: taskarena-v2
-        run: |
-          pyinstaller taskarena-backend.spec --clean --noconfirm
-          BUNDLE_DIR="frontend/src-tauri/binaries/backend-bundle"
-          rm -rf "$BUNDLE_DIR"
-          mkdir -p "$BUNDLE_DIR"
-          cp -r dist/taskarena-backend/. "$BUNDLE_DIR/"
-          chmod +x "$BUNDLE_DIR/taskarena-backend" 2>/dev/null || true
-
-      - name: Build Windows backend (Python embeddable)
+      - name: Build Windows backend bundle
         if: matrix.os == 'windows-latest'
         shell: pwsh
         working-directory: taskarena-v2
         run: |
+          $ErrorActionPreference = "Stop"
           $pythonVersion = "3.10.11"
           $embedUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip"
+          $embedZip = "python-embed.zip"
           $embedDir = "python-embed"
           $bundleDir = "frontend\src-tauri\binaries\backend-bundle"
+          $sitePackagesDir = Join-Path $embedDir "Lib\site-packages"
 
-          if (Test-Path $embedDir) { Remove-Item $embedDir -Recurse -Force }
-          if (Test-Path $bundleDir) { Remove-Item $bundleDir -Recurse -Force }
+          if (Test-Path $embedDir) {
+            Remove-Item $embedDir -Recurse -Force
+          }
+          if (Test-Path $bundleDir) {
+            Remove-Item $bundleDir -Recurse -Force
+          }
+          if (Test-Path $embedZip) {
+            Remove-Item $embedZip -Force
+          }
 
-          Write-Host "Downloading Python $pythonVersion embeddable..."
-          Invoke-WebRequest -Uri $embedUrl -OutFile "python-embed.zip" -UseBasicParsing
-          Expand-Archive "python-embed.zip" -DestinationPath $embedDir -Force
-          Remove-Item "python-embed.zip"
+          Invoke-WebRequest -Uri $embedUrl -OutFile $embedZip -UseBasicParsing
+          Expand-Archive $embedZip -DestinationPath $embedDir -Force
+          Remove-Item $embedZip -Force
 
           $pthFile = Get-ChildItem "$embedDir\python*._pth" | Select-Object -First 1
-          if (-not $pthFile) { throw "Could not find ._pth file in embeddable Python" }
-
-          $pthContent = Get-Content $pthFile.FullName
-          $pthContent = $pthContent | ForEach-Object {
-            if ($_ -match "^#import site") { "import site" } else { $_ }
+          if (-not $pthFile) {
+            throw "Could not find the embeddable Python ._pth file."
           }
-          if ($pthContent -notcontains ".") { $pthContent += "." }
-          Set-Content $pthFile.FullName ($pthContent -join "`n") -NoNewline
+
+          $pthLines = Get-Content $pthFile.FullName
+          $updatedPthLines = foreach ($line in $pthLines) {
+            if ($line -match "^#import site") {
+              "import site"
+            } else {
+              $line
+            }
+          }
+          if ($updatedPthLines -notcontains ".") {
+            $updatedPthLines += "."
+          }
+          Set-Content -Path $pthFile.FullName -Value ($updatedPthLines -join "`n") -NoNewline
+
+          New-Item -ItemType Directory -Force -Path $sitePackagesDir | Out-Null
 
           Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile "get-pip.py" -UseBasicParsing
-          & "$embedDir\python.exe" "get-pip.py" --no-warn-script-location --quiet
-          Remove-Item "get-pip.py"
+          & "$embedDir\python.exe" "get-pip.py" --no-warn-script-location
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install pip into the embeddable runtime."
+          }
+          Remove-Item "get-pip.py" -Force
 
-          Write-Host "Installing Python packages..."
-          # The embeddable runtime can consume wheels reliably, but native source builds
-          # like llama-cpp-python are not suitable for this release packaging path.
-          & "$embedDir\python.exe" -m pip install -r requirements-ci.txt --no-warn-script-location --quiet
-          if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+          & "$embedDir\python.exe" -m pip install --requirement requirements-ci.txt --target $sitePackagesDir --no-warn-script-location
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install requirements-ci.txt into the embeddable runtime."
+          }
 
           New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
           Copy-Item "$embedDir\*" $bundleDir -Recurse -Force
@@ -108,10 +103,49 @@ jobs:
           Copy-Item "alembic.ini" "$bundleDir\alembic.ini" -Force
           Copy-Item ".env.example" "$bundleDir\.env" -Force
 
-          Get-ChildItem $bundleDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-          Get-ChildItem $bundleDir -Recurse -File -Filter "*.pyc" | Remove-Item -Force -ErrorAction SilentlyContinue
+          Get-ChildItem $bundleDir -Recurse -Directory -Filter "__pycache__" |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem $bundleDir -Recurse -File -Filter "*.pyc" |
+            Remove-Item -Force -ErrorAction SilentlyContinue
 
-          Write-Host "Windows bundle ready."
+      - name: Set up Python
+        if: matrix.os != 'windows-latest'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: taskarena-v2/requirements-ci.txt
+
+      - name: Install macOS build dependencies
+        if: matrix.os == 'macos-latest'
+        run: brew install cmake
+
+      - name: Install Python build dependencies
+        if: matrix.os != 'windows-latest'
+        working-directory: taskarena-v2
+        run: pip install -r requirements-ci.txt pyinstaller
+
+      - name: Build Mac/Linux backend bundle
+        if: matrix.os != 'windows-latest'
+        working-directory: taskarena-v2
+        run: |
+          pyinstaller taskarena-backend.spec --clean --noconfirm
+          BUNDLE_DIR="frontend/src-tauri/binaries/backend-bundle"
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR"
+          cp -r dist/taskarena-backend/. "$BUNDLE_DIR/"
+          chmod +x "$BUNDLE_DIR/taskarena-backend" 2>/dev/null || true
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -129,18 +163,20 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Linux system dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libfuse2
+      - name: Build and release (Windows/macOS)
+        if: matrix.os != 'ubuntu-22.04'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: taskarena-v2/frontend
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: "TaskArena ${{ github.event.inputs.tag || github.ref_name }}"
+          releaseDraft: true
+          args: --target ${{ matrix.target }}
 
-      - name: Build and release
+      - name: Build and release (Linux)
+        if: matrix.os == 'ubuntu-22.04'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -150,60 +186,26 @@ jobs:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "TaskArena ${{ github.event.inputs.tag || github.ref_name }}"
           releaseDraft: true
-          prerelease: false
-          args: >-
-            --target ${{ matrix.target }}
-            ${{ matrix.bundles && format('--bundles {0}', matrix.bundles) || '' }}
-          releaseBody: |
-            ## TaskArena ${{ github.event.inputs.tag || github.ref_name }}
+          args: --target ${{ matrix.target }} --bundles "deb rpm"
 
-            ### Download
-            | Platform | File |
-            |---|---|
-            | Windows | `TaskArena_*_x64-setup.exe` |
-            | Mac (Intel) | `TaskArena_*_x64.dmg` |
-            | Mac (Apple Silicon) | `TaskArena_*_aarch64.dmg` |
-            | Mac (Alternative zip) | `TaskArena-<tag>-x64.zip` or `TaskArena-<tag>-aarch64.zip` |
-            | Linux (Ubuntu/Debian) | `TaskArena_*_amd64.deb` |
-            | Linux (Fedora) | `TaskArena_*_x86_64.rpm` |
-
-            ### First time setup
-            The app guides you through setup on first launch.
-            Get a free Groq API key at https://console.groq.com/keys
-
-            ### Mac Installation (unsigned)
-            1. Download the `.zip` file for your Mac.
-            2. Double-click to extract `TaskArena.app`.
-            3. Right-click `TaskArena.app` and choose `Open`.
-            4. Click `Open` on the security warning.
-            5. The app should open normally after that.
-
-      - name: Create Mac zip (alternative to DMG for unsigned apps)
+      - name: Create macOS app zip
         if: matrix.os == 'macos-latest'
-        shell: bash
+        working-directory: taskarena-v2
         run: |
-          APP_DIR="taskarena-v2/frontend/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
+          APP_DIR="frontend/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
           APP_PATH="$APP_DIR/TaskArena.app"
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          ZIP_NAME="TaskArena-${{ github.event.inputs.tag || github.ref_name }}-aarch64.zip"
 
-          case "${{ matrix.target }}" in
-            aarch64-apple-darwin) ARCH_SUFFIX="aarch64" ;;
-            x86_64-apple-darwin) ARCH_SUFFIX="x64" ;;
-            *) ARCH_SUFFIX="${{ matrix.target }}" ;;
-          esac
-
-          ZIP_NAME="TaskArena-${TAG}-${ARCH_SUFFIX}.zip"
-
-          if [ -d "$APP_PATH" ]; then
-            cd "$APP_DIR"
-            rm -f "$ZIP_NAME"
-            ditto -c -k --sequesterRsrc --keepParent "TaskArena.app" "$ZIP_NAME"
-            echo "Zip created at: $APP_DIR/$ZIP_NAME"
-          else
-            echo "App bundle not found, skipping zip"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Expected app bundle not found at $APP_PATH"
+            exit 1
           fi
 
-      - name: Upload Mac zip to release
+          cd "$APP_DIR"
+          rm -f "$ZIP_NAME"
+          ditto -c -k --sequesterRsrc --keepParent "TaskArena.app" "$ZIP_NAME"
+
+      - name: Upload macOS app zip
         if: matrix.os == 'macos-latest'
         uses: softprops/action-gh-release@v1
         env:
@@ -211,5 +213,4 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           draft: true
-          files: |
-            taskarena-v2/frontend/src-tauri/target/${{ matrix.target }}/release/bundle/macos/TaskArena-${{ github.event.inputs.tag || github.ref_name }}-*.zip
+          files: taskarena-v2/frontend/src-tauri/target/${{ matrix.target }}/release/bundle/macos/TaskArena-${{ github.event.inputs.tag || github.ref_name }}-aarch64.zip
