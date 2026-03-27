@@ -186,7 +186,7 @@ jobs:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "TaskArena ${{ github.event.inputs.tag || github.ref_name }}"
           releaseDraft: true
-          args: --target ${{ matrix.target }} --bundles "deb rpm"
+          args: --target ${{ matrix.target }} --bundles deb rpm
 
       - name: Create macOS app zip
         if: matrix.os == 'macos-latest'
