@@ -7,18 +7,32 @@ Launched by Tauri. Picks a free port, runs migrations, prints READY, then serves
 from __future__ import annotations
 
 import argparse
+import os
 import socket
 import sys
 from pathlib import Path
 
 
+def _env_path(name: str) -> Path | None:
+    raw_value = os.getenv(name)
+    if not raw_value:
+        return None
+    return Path(raw_value).resolve()
+
+
 def get_runtime_root() -> Path:
+    env_runtime_root = _env_path("TASKARENA_RUNTIME_DIR")
+    if env_runtime_root is not None:
+        return env_runtime_root
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
 
 
 def get_resource_root() -> Path:
+    env_resource_root = _env_path("TASKARENA_RESOURCE_DIR")
+    if env_resource_root is not None:
+        return env_resource_root
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
     return Path(__file__).resolve().parent.parent
