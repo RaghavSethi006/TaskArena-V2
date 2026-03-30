@@ -85,9 +85,11 @@ def run_migrations() -> None:
 
     from alembic import command
     from alembic.config import Config
+    from shared.config import settings
 
     alembic_cfg = Config(str(alembic_ini))
     alembic_cfg.set_main_option("script_location", str(alembic_dir))
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.db_url)
     command.upgrade(alembic_cfg, "head")
 
 

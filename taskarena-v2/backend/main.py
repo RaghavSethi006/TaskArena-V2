@@ -45,6 +45,7 @@ def run_migrations_if_needed() -> None:
 
         alembic_cfg = Config(str(alembic_ini))
         alembic_cfg.set_main_option("script_location", str(alembic_dir))
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.db_url)
         command.upgrade(alembic_cfg, "head")
         logger.info("Database migrations checked")
     except Exception as exc:
