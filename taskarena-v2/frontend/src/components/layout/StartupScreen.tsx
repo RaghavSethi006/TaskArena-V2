@@ -12,8 +12,8 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
   const [status, setStatus] = useState<StartupStatus>("waiting")
   const [dots, setDots] = useState("")
   const [attempt, setAttempt] = useState(0)
-  const SLOW_START_ATTEMPT = 30
-  const RETRY_BUTTON_ATTEMPT = 60
+  const SLOW_START_ATTEMPT = 60
+  const RETRY_BUTTON_ATTEMPT = 120
 
   // Show the window once React has mounted (prevents white flash)
   useEffect(() => {
@@ -93,7 +93,7 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
       <p className="text-[12px] text-tx3 mb-3">Starting up{dots}</p>
       {isSlowStart && (
         <p className="text-[11px] text-tx3 text-center max-w-[320px] leading-relaxed mb-3">
-          First launch can take a little longer while TaskArena prepares its local database.
+          Starting local services. This can take a little longer on some launches.
         </p>
       )}
 
