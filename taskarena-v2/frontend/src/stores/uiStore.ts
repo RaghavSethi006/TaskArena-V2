@@ -16,6 +16,8 @@ interface UIStore {
   // Onboarding
   hasSeenOnboarding: boolean
   setHasSeenOnboarding: (v: boolean) => void
+  hasHydrated: boolean
+  setHasHydrated: (v: boolean) => void
 }
 
 export const useUIStore = create<UIStore>()(
@@ -35,7 +37,19 @@ export const useUIStore = create<UIStore>()(
 
       hasSeenOnboarding: false,
       setHasSeenOnboarding: (v) => set({ hasSeenOnboarding: v }),
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
-    { name: "taskarena-ui" }
+    {
+      name: "taskarena-ui",
+      partialize: (state) => ({
+        sidebarCollapsed: state.sidebarCollapsed,
+        preferences: state.preferences,
+        hasSeenOnboarding: state.hasSeenOnboarding,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
+    }
   )
 )

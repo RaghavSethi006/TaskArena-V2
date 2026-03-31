@@ -56,12 +56,20 @@ function needsAISetup(config: AIConfig): boolean {
 }
 
 function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { hasSeenOnboarding, setHasSeenOnboarding } = useUIStore()
-  const [showWizard, setShowWizard] = useState(!hasSeenOnboarding)
+  const { hasSeenOnboarding, setHasSeenOnboarding, hasHydrated } = useUIStore()
+  const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState<OnboardingStepId>("welcome")
   const [aiPrompted, setAiPrompted] = useState(false)
 
   useEffect(() => {
+    if (!hasHydrated || hasSeenOnboarding) return
+    setWizardStep("welcome")
+    setShowWizard(true)
+  }, [hasHydrated, hasSeenOnboarding])
+
+  useEffect(() => {
+    if (!hasHydrated) return
+
     let active = true
     const checkAISetup = async () => {
       try {
@@ -81,7 +89,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
     return () => {
       active = false
     }
-  }, [hasSeenOnboarding, aiPrompted])
+  }, [hasHydrated, hasSeenOnboarding, aiPrompted])
 
   // Also listen for the "restart-tutorial" custom event fired from ProfilePage
   useEffect(() => {
