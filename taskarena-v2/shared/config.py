@@ -73,6 +73,18 @@ class Settings(BaseSettings):
                 return True
         return value
 
+    @field_validator("db_path", "local_model_path", "embedding_cache_dir", mode="before")
+    @classmethod
+    def _resolve_runtime_relative_paths(cls, value):
+        if not isinstance(value, str):
+            return value
+
+        candidate = Path(value).expanduser()
+        if candidate.is_absolute():
+            return str(candidate)
+
+        return str((RUNTIME_ROOT / candidate).resolve())
+
     @property
     def db_url(self) -> str:
         return f"sqlite:///{self.db_path}"
