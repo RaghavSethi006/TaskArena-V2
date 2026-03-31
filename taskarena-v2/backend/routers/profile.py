@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from backend.dependencies import get_current_user_id, get_db
 from features.tasks.service import TaskService
 from shared.config import settings
+from shared.config import persist_runtime_settings
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -22,6 +23,7 @@ class AIConfigUpdateBody(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     groq_api_key: Optional[str] = None
+    ollama_url: Optional[str] = None
 
 
 def _build_ai_config() -> dict:
@@ -77,11 +79,22 @@ def get_ai_config():
 def update_ai_config(body: AIConfigUpdateBody):
     updates = body.model_dump(exclude_none=True)
 
+    env_updates: dict[str, str | None] = {}
+
     if "provider" in updates:
         settings.ai_provider = updates["provider"]
+        env_updates["AI_PROVIDER"] = updates["provider"]
     if "model" in updates:
         settings.groq_model = updates["model"]
+        env_updates["GROQ_MODEL"] = updates["model"]
     if "groq_api_key" in updates:
         settings.groq_api_key = updates["groq_api_key"]
+        env_updates["GROQ_API_KEY"] = updates["groq_api_key"]
+    if "ollama_url" in updates:
+        settings.ollama_base_url = updates["ollama_url"]
+        env_updates["OLLAMA_BASE_URL"] = updates["ollama_url"]
+
+    if env_updates:
+        persist_runtime_settings(env_updates)
 
     return _build_ai_config()
