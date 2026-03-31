@@ -19,6 +19,8 @@ from backend.routers import (
     tasks,
 )
 from shared.config import settings
+from shared.database import SessionLocal
+from shared.user_model import User
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -27,6 +29,15 @@ logging.basicConfig(
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 logger = logging.getLogger("taskarena")
+
+
+def ensure_default_user() -> None:
+    with SessionLocal() as db:
+        user = db.get(User, 1)
+        if user is None:
+            db.add(User(id=1, name="Student"))
+            db.commit()
+            logger.info("Created default local user")
 
 
 def run_migrations_if_needed() -> None:
@@ -64,6 +75,7 @@ async def lifespan(app: FastAPI):
         logger.info("Skipping app-startup migrations because the sidecar already handled them")
     else:
         run_migrations_if_needed()
+    ensure_default_user()
     yield
 
     logger.info("TaskArena backend shutting down.")

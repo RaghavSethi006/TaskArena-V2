@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import set_key
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
@@ -29,9 +30,10 @@ else:
     RUNTIME_ROOT = SOURCE_ROOT
     RESOURCE_ROOT = SOURCE_ROOT
 
-ENV_FILES = [str(RUNTIME_ROOT / ".env")]
+RUNTIME_ENV_FILE = RUNTIME_ROOT / ".env"
+ENV_FILES = [str(RUNTIME_ENV_FILE)]
 RESOURCE_ENV_FILE = RESOURCE_ROOT / ".env"
-if RESOURCE_ENV_FILE != RUNTIME_ROOT / ".env":
+if RESOURCE_ENV_FILE != RUNTIME_ENV_FILE:
     ENV_FILES.append(str(RESOURCE_ENV_FILE))
 
 
@@ -105,3 +107,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def persist_runtime_settings(updates: dict[str, str | None]) -> None:
+    RUNTIME_ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not RUNTIME_ENV_FILE.exists():
+        RUNTIME_ENV_FILE.write_text("", encoding="utf-8")
+
+    for key, value in updates.items():
+        set_key(str(RUNTIME_ENV_FILE), key, value or "")
