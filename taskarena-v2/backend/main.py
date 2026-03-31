@@ -1,3 +1,4 @@
+import os
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -59,7 +60,10 @@ async def lifespan(app: FastAPI):
     logger.info(f"Database: {settings.db_path}")
     logger.info(f"AI provider: {settings.ai_provider}")
 
-    run_migrations_if_needed()
+    if os.getenv("TASKARENA_RESOURCE_DIR"):
+        logger.info("Skipping app-startup migrations because the sidecar already handled them")
+    else:
+        run_migrations_if_needed()
     yield
 
     logger.info("TaskArena backend shutting down.")
