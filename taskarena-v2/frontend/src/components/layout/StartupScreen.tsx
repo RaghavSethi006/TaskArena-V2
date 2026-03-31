@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { getBaseApiUrl } from "@/api/client"
 
-type StartupStatus = "waiting" | "ready" | "failed"
+type StartupStatus = "waiting" | "ready"
 
 interface StartupScreenProps {
   onReady: () => void
@@ -12,7 +12,8 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
   const [status, setStatus] = useState<StartupStatus>("waiting")
   const [dots, setDots] = useState("")
   const [attempt, setAttempt] = useState(0)
-  const MAX_ATTEMPTS = 30 // 15 seconds total
+  const SLOW_START_ATTEMPT = 30
+  const RETRY_BUTTON_ATTEMPT = 60
 
   // Show the window once React has mounted (prevents white flash)
   useEffect(() => {
@@ -29,14 +30,16 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
     return () => clearInterval(interval)
   }, [])
 
-  // Poll the backend health endpoint
+  // Poll the backend health endpoint until it comes up.
   useEffect(() => {
     if (status !== "waiting") return
+
+    let cancelled = false
 
     const poll = async () => {
       try {
         const base = await getBaseApiUrl()
-        const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(2000) })
+        const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) })
         if (res.ok) {
           setStatus("ready")
           // Small delay so the "ready" state is visible for a moment
@@ -46,15 +49,21 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
       } catch {
         // Not ready yet
       }
-      setAttempt((a) => {
-        const next = a + 1
-        if (next >= MAX_ATTEMPTS) setStatus("failed")
-        return next
-      })
+
+      if (cancelled) return
+
+      setAttempt((a) => a + 1)
+      window.setTimeout(() => {
+        if (!cancelled) {
+          void poll()
+        }
+      }, 500)
     }
 
-    const interval = setInterval(() => void poll(), 500)
-    return () => clearInterval(interval)
+    void poll()
+    return () => {
+      cancelled = true
+    }
   }, [status, onReady])
 
   if (status === "ready") {
@@ -70,42 +79,10 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
     )
   }
 
-  if (status === "failed") {
-    return (
-      <div className="fixed inset-0 z-[99999] bg-bg flex flex-col items-center justify-center p-8">
-        <div className="w-14 h-14 rounded-[14px] bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center mb-5">
-          <span className="text-[20px] font-bold text-white font-mono">TA</span>
-        </div>
-        <h2 className="text-[18px] font-bold text-tx mb-2">Backend did not start</h2>
-        <p className="text-[12px] text-tx3 text-center max-w-[320px] leading-relaxed mb-6">
-          The TaskArena backend took too long to start. This usually means the app
-          bundled incorrectly or an antivirus is blocking the sidecar process.
-        </p>
-        <div className="rounded-[10px] border border-b1 bg-s1 p-4 max-w-[360px] w-full space-y-2 mb-5">
-          {[
-            "Check that your antivirus is not blocking TaskArena",
-            "Try closing and reopening the app",
-            "If the problem persists, reinstall from the latest release",
-          ].map((tip, i) => (
-            <div key={i} className="flex items-start gap-2 text-[11px] text-tx2">
-              <span className="text-tx3 font-mono flex-shrink-0 mt-0.5">{i + 1}.</span>
-              {tip}
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="h-9 px-5 rounded-[8px] bg-blue-500 text-white text-[12px] hover:bg-blue-600 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    )
-  }
-
   // Waiting state
-  const loadingPercent = Math.min(95, (attempt / MAX_ATTEMPTS) * 100)
+  const loadingPercent = Math.min(95, Math.max(10, attempt * 2))
+  const isSlowStart = attempt >= SLOW_START_ATTEMPT
+  const showRetryButton = attempt >= RETRY_BUTTON_ATTEMPT
 
   return (
     <div className="fixed inset-0 z-[99999] bg-bg flex flex-col items-center justify-center">
@@ -113,7 +90,12 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
         <span className="text-[20px] font-bold text-white font-mono">TA</span>
       </div>
       <p className="text-[14px] font-semibold text-tx mb-1">TaskArena</p>
-      <p className="text-[12px] text-tx3 mb-6">Starting up{dots}</p>
+      <p className="text-[12px] text-tx3 mb-3">Starting up{dots}</p>
+      {isSlowStart && (
+        <p className="text-[11px] text-tx3 text-center max-w-[320px] leading-relaxed mb-3">
+          First launch can take a little longer while TaskArena prepares its local database.
+        </p>
+      )}
 
       {/* Loading bar */}
       <div className="w-[200px] h-1 rounded-full bg-s2 overflow-hidden">
@@ -124,8 +106,17 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
       </div>
 
       <p className="text-[10px] text-tx3 font-mono mt-3">
-        {attempt < 5 ? "Loading..." : attempt < 15 ? "Starting services..." : "Almost ready..."}
+        {attempt < 5 ? "Loading..." : attempt < 15 ? "Starting services..." : isSlowStart ? "Finishing setup..." : "Almost ready..."}
       </p>
+      {showRetryButton && (
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-5 h-9 px-5 rounded-[8px] border border-b1 bg-s1 text-tx text-[12px] hover:bg-s2 transition-colors"
+        >
+          Retry
+        </button>
+      )}
     </div>
   )
 }
