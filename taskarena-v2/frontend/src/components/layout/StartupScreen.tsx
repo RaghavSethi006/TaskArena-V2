@@ -70,7 +70,7 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
   if (status === "ready") {
     return (
       <div className="fixed inset-0 z-[99999] bg-bg flex flex-col items-center justify-center animate-fadeUp">
-        <AppLogo className="mb-4 h-14 w-14" imageClassName="p-1.5" />
+        <AppLogo className="mb-4 h-14 w-14" />
         <div className="w-5 h-5 rounded-full border-2 border-emerald-400 flex items-center justify-center">
           <div className="w-2 h-2 rounded-full bg-emerald-400" />
         </div>
@@ -85,7 +85,7 @@ export default function StartupScreen({ onReady }: StartupScreenProps) {
 
   return (
     <div className="fixed inset-0 z-[99999] bg-bg flex flex-col items-center justify-center">
-      <AppLogo className="mb-6 h-14 w-14" imageClassName="p-1.5" />
+      <AppLogo className="mb-6 h-14 w-14" />
       <p className="text-[14px] font-semibold text-tx mb-1">TaskArena</p>
       <p className="text-[12px] text-tx3 mb-3">Starting up{dots}</p>
       {isSlowStart && (

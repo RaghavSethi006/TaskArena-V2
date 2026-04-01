@@ -118,7 +118,7 @@ export default function Sidebar() {
       ) : null}
       <div className="relative flex h-full flex-col">
         <div className={cn("h-[50px] flex items-center border-b border-b1", collapsed ? "justify-center" : "px-4")}> 
-          <AppLogo className="h-6 w-6 rounded-[7px] flex-shrink-0" imageClassName="scale-[1.02]" />
+          <AppLogo className="h-6 w-6 flex-shrink-0" />
           {!collapsed && <span className="ml-2 text-[13px] font-semibold tracking-tight text-tx">TaskArena</span>}
         </div>
 

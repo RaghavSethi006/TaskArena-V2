@@ -19,6 +19,16 @@ fn set_backend_port(app: &tauri::App, port: u16) {
     }
 }
 
+fn apply_main_window_icon(app: &tauri::App) {
+    let Some(icon) = app.default_window_icon().cloned() else {
+        return;
+    };
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_icon(icon);
+    }
+}
+
 #[cfg(dev)]
 fn start_backend(app: &mut tauri::App) {
     set_backend_port(app, BACKEND_PORT);
@@ -282,6 +292,7 @@ pub fn run() {
         })
         .setup(|app| {
             start_backend(app);
+            apply_main_window_icon(app);
             if let Some(window) = app.get_webview_window("main") {
                 thread::spawn(move || {
                     thread::sleep(Duration::from_millis(200));
