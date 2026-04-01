@@ -9,20 +9,45 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class ConversationCreate(BaseModel):
     title: str | None = None
+    group_id: int | None = None
     context_course_id: int | None = None
     context_folder_id: int | None = None
     context_file_id: int | None = None
 
 
+class ConversationUpdate(BaseModel):
+    title: str | None = None
+    group_id: int | None = None
+
+
 class ConversationOut(BaseModel):
     id: int
     title: str | None
+    group_id: int | None
     context_course_id: int | None
     context_folder_id: int | None
     context_file_id: int | None
     created_at: datetime
     updated_at: datetime
     message_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatGroupCreate(BaseModel):
+    name: str
+
+
+class ChatGroupUpdate(BaseModel):
+    name: str
+
+
+class ChatGroupOut(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    updated_at: datetime
+    conversation_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

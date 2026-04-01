@@ -19,6 +19,10 @@ class ChatConversation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("chat_groups.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     context_course_id: Mapped[int | None] = mapped_column(
         ForeignKey("courses.id"),
         nullable=True,
@@ -40,6 +44,9 @@ class ChatConversation(Base):
     )
 
     user: Mapped["User"] = relationship("User", back_populates="chat_conversations")
+    group: Mapped["ChatGroup | None"] = relationship(
+        "ChatGroup", back_populates="conversations"
+    )
     context_course: Mapped["Course | None"] = relationship(
         "Course", back_populates="chat_conversations"
     )
@@ -47,6 +54,34 @@ class ChatConversation(Base):
         "ChatMessage",
         back_populates="conversation",
         cascade="all, delete-orphan",
+    )
+
+
+class ChatGroup(Base):
+    __tablename__ = "chat_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="chat_groups")
+    conversations: Mapped[list["ChatConversation"]] = relationship(
+        "ChatConversation",
+        back_populates="group",
     )
 
 

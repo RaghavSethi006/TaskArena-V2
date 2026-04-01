@@ -18,6 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import AppLogo from "@/components/branding/AppLogo"
 import { useProfile } from "@/hooks/useProfile"
 import { cn } from "@/lib/utils"
 import { useUIStore } from "@/stores/uiStore"
@@ -92,7 +93,9 @@ function NavItem({ icon: Icon, label, path, collapsed }: NavItemProps) {
 }
 
 export default function Sidebar() {
-  const { sidebarCollapsed: collapsed, toggleSidebar } = useUIStore()
+  const collapsed = useUIStore((state) => state.sidebarCollapsed)
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar)
+  const sidebarStyle = useUIStore((state) => state.appearance.sidebarStyle)
   const profileQuery = useProfile()
   const profileName = profileQuery.data?.name ?? "—"
   const profileXp = profileQuery.data?.xp ?? 0
@@ -102,16 +105,20 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative h-screen bg-s1 border-r border-b1 overflow-y-auto",
+        "relative h-screen overflow-y-auto",
         "transition-[width,min-width] duration-200 ease-in-out",
+        sidebarStyle === "frosted"
+          ? "border-r border-[color:var(--sidebar-edge)] bg-[color:var(--sidebar-bg)] supports-[backdrop-filter]:bg-[color:var(--sidebar-bg-strong)] supports-[backdrop-filter]:backdrop-blur-2xl shadow-[0_12px_40px_var(--sidebar-shadow)]"
+          : "bg-s1 border-r border-b1",
         collapsed ? "w-[56px] min-w-[56px]" : "w-[220px] min-w-[220px]"
       )}
     >
-      <div className="flex h-full flex-col">
+      {sidebarStyle === "frosted" ? (
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.03)_32%,rgba(255,255,255,0.05))]" />
+      ) : null}
+      <div className="relative flex h-full flex-col">
         <div className={cn("h-[50px] flex items-center border-b border-b1", collapsed ? "justify-center" : "px-4")}> 
-          <div className="w-6 h-6 rounded-[7px] bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-[10px] font-bold text-white font-mono">TA</span>
-          </div>
+          <AppLogo className="h-6 w-6 flex-shrink-0" />
           {!collapsed && <span className="ml-2 text-[13px] font-semibold tracking-tight text-tx">TaskArena</span>}
         </div>
 

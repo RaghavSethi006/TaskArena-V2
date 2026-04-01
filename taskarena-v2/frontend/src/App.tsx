@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import { Toaster } from "sonner"
-import { api } from "./api/client"
 import AppShell from "./components/layout/AppShell"
 import OnboardingWizard, { type OnboardingStepId } from "./components/layout/OnboardingWizard"
 import StartupScreen from "./components/layout/StartupScreen"
@@ -41,55 +40,18 @@ function GlobalTimerEffect() {
   return null
 }
 
-type AIConfig = {
-  provider: string
-  groq_key_set: boolean
-  local_model_exists: boolean
-  ollama_available: boolean
-}
-
-function needsAISetup(config: AIConfig): boolean {
-  if (config.provider === "groq") return !config.groq_key_set
-  if (config.provider === "local") return !config.local_model_exists
-  if (config.provider === "ollama") return !config.ollama_available
-  return true
-}
-
 function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { hasSeenOnboarding, setHasSeenOnboarding, hasHydrated } = useUIStore()
+  const setHasSeenOnboarding = useUIStore((state) => state.setHasSeenOnboarding)
+  const hasHydrated = useUIStore((state) => state.hasHydrated)
+  const showStartupTutorial = useUIStore((state) => state.preferences.showStartupTutorial)
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState<OnboardingStepId>("welcome")
-  const [aiPrompted, setAiPrompted] = useState(false)
 
   useEffect(() => {
-    if (!hasHydrated || hasSeenOnboarding) return
+    if (!hasHydrated || !showStartupTutorial) return
     setWizardStep("welcome")
     setShowWizard(true)
-  }, [hasHydrated, hasSeenOnboarding])
-
-  useEffect(() => {
-    if (!hasHydrated) return
-
-    let active = true
-    const checkAISetup = async () => {
-      try {
-        const config = await api.get<AIConfig>("/profile/ai-config")
-        if (!active) return
-        if (hasSeenOnboarding && !aiPrompted && needsAISetup(config)) {
-          setWizardStep("ai")
-          setShowWizard(true)
-          setAiPrompted(true)
-        }
-      } catch {
-        // Ignore AI detection failures during startup
-      }
-    }
-
-    void checkAISetup()
-    return () => {
-      active = false
-    }
-  }, [hasHydrated, hasSeenOnboarding, aiPrompted])
+  }, [hasHydrated, showStartupTutorial])
 
   // Also listen for the "restart-tutorial" custom event fired from ProfilePage
   useEffect(() => {
@@ -111,7 +73,6 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
             setHasSeenOnboarding(true)
             setShowWizard(false)
             setWizardStep("welcome")
-            setAiPrompted(true)
           }}
         />
       )}
@@ -119,8 +80,26 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   )
 }
 
+function AppearanceEffect() {
+  const colorMode = useUIStore((state) => state.appearance.colorMode)
+  const theme = useUIStore((state) => state.appearance.theme)
+  const surfaceStyle = useUIStore((state) => state.appearance.surfaceStyle)
+  const reducedMotion = useUIStore((state) => state.appearance.reducedMotion)
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.colorMode = colorMode
+    root.dataset.theme = theme
+    root.dataset.surface = surfaceStyle
+    root.dataset.motion = reducedMotion ? "reduced" : "full"
+  }, [colorMode, theme, surfaceStyle, reducedMotion])
+
+  return null
+}
+
 export default function App() {
   const [backendReady, setBackendReady] = useState(false)
+  const colorMode = useUIStore((state) => state.appearance.colorMode)
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -128,6 +107,7 @@ export default function App() {
         <StartupScreen onReady={() => setBackendReady(true)} />
       )}
       <BrowserRouter>
+        <AppearanceEffect />
         <GlobalTimerEffect />
         {backendReady && (
           <OnboardingGate>
@@ -147,7 +127,7 @@ export default function App() {
             </AppShell>
           </OnboardingGate>
         )}
-        <Toaster position="bottom-right" theme="dark" richColors />
+        <Toaster position="bottom-right" theme={colorMode === "light" ? "light" : "dark"} richColors />
       </BrowserRouter>
     </QueryClientProvider>
   )
