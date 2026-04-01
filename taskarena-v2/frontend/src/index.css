@@ -43,6 +43,175 @@
     --rose:   #f43f5e;   --rd: rgba(244,63,94,.12);
     --orange: #f97316;   --od: rgba(249,115,22,.12);
     --violet: #8b5cf6;   --vd: rgba(139,92,246,.12);
+
+    --glow-1: rgba(59, 130, 246, 0.18);
+    --glow-2: rgba(139, 92, 246, 0.14);
+    --grid-line: rgba(255, 255, 255, 0.045);
+    --app-bg-image:
+      radial-gradient(circle at top left, var(--glow-1), transparent 42%),
+      radial-gradient(circle at 82% 12%, var(--glow-2), transparent 34%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+    --app-bg-size: cover;
+    --app-bg-position: center;
+  }
+
+  :root[data-theme="obsidian"] {
+    --background:         240 10% 3.9%;
+    --foreground:         0 0% 98%;
+    --card:               240 10% 6.7%;
+    --card-foreground:    0 0% 98%;
+    --popover:            240 10% 6.7%;
+    --popover-foreground: 0 0% 98%;
+    --secondary:          240 5% 10.8%;
+    --muted:              240 3.7% 15.9%;
+    --muted-foreground:   240 5% 44.9%;
+    --accent:             240 3.7% 15.9%;
+    --border:             240 3.7% 15.9%;
+    --input:              240 5% 10.8%;
+    --bg:     #09090b;
+    --s1:     #111113;
+    --s2:     #18181b;
+    --s3:     #1c1c20;
+    --b1:     #27272a;
+    --b2:     #3f3f46;
+    --tx:     #fafafa;
+    --tx2:    #a1a1aa;
+    --tx3:    #71717a;
+    --glow-1: rgba(59, 130, 246, 0.18);
+    --glow-2: rgba(139, 92, 246, 0.14);
+    --grid-line: rgba(255, 255, 255, 0.045);
+  }
+
+  :root[data-theme="graphite"] {
+    --background:         222 47% 7%;
+    --foreground:         210 40% 98%;
+    --card:               220 28% 13%;
+    --card-foreground:    210 40% 98%;
+    --popover:            220 28% 13%;
+    --popover-foreground: 210 40% 98%;
+    --secondary:          217 24% 16%;
+    --muted:              217 19% 20%;
+    --muted-foreground:   215 16% 65%;
+    --accent:             217 19% 20%;
+    --border:             217 19% 20%;
+    --input:              217 24% 16%;
+    --bg:     #0f172a;
+    --s1:     #172033;
+    --s2:     #1e293b;
+    --s3:     #243246;
+    --b1:     #334155;
+    --b2:     #475569;
+    --tx:     #e2e8f0;
+    --tx2:    #94a3b8;
+    --tx3:    #64748b;
+    --glow-1: rgba(96, 165, 250, 0.16);
+    --glow-2: rgba(56, 189, 248, 0.12);
+    --grid-line: rgba(148, 163, 184, 0.08);
+  }
+
+  :root[data-theme="evergreen"] {
+    --background:         158 36% 6%;
+    --foreground:         150 20% 96%;
+    --card:               154 31% 11%;
+    --card-foreground:    150 20% 96%;
+    --popover:            154 31% 11%;
+    --popover-foreground: 150 20% 96%;
+    --secondary:          154 20% 14%;
+    --muted:              154 15% 18%;
+    --muted-foreground:   151 10% 62%;
+    --accent:             154 15% 18%;
+    --border:             154 15% 18%;
+    --input:              154 20% 14%;
+    --bg:     #08110d;
+    --s1:     #0d1813;
+    --s2:     #13211a;
+    --s3:     #183126;
+    --b1:     #254235;
+    --b2:     #37614d;
+    --tx:     #ecfdf5;
+    --tx2:    #9ac8b4;
+    --tx3:    #6c9383;
+    --glow-1: rgba(16, 185, 129, 0.17);
+    --glow-2: rgba(52, 211, 153, 0.12);
+    --grid-line: rgba(110, 231, 183, 0.07);
+  }
+
+  :root[data-theme="ember"] {
+    --background:         20 35% 7%;
+    --foreground:         24 50% 96%;
+    --card:               18 28% 12%;
+    --card-foreground:    24 50% 96%;
+    --popover:            18 28% 12%;
+    --popover-foreground: 24 50% 96%;
+    --secondary:          18 24% 16%;
+    --muted:              18 19% 19%;
+    --muted-foreground:   20 13% 64%;
+    --accent:             18 19% 19%;
+    --border:             18 19% 19%;
+    --input:              18 24% 16%;
+    --bg:     #140d0a;
+    --s1:     #1a110d;
+    --s2:     #231613;
+    --s3:     #2d1e1a;
+    --b1:     #45302a;
+    --b2:     #67463b;
+    --tx:     #fff7ed;
+    --tx2:    #fdba74;
+    --tx3:    #b98963;
+    --glow-1: rgba(249, 115, 22, 0.18);
+    --glow-2: rgba(251, 146, 60, 0.13);
+    --grid-line: rgba(251, 146, 60, 0.08);
+  }
+
+  :root[data-theme="aurora"] {
+    --background:         237 39% 8%;
+    --foreground:         240 25% 97%;
+    --card:               235 28% 13%;
+    --card-foreground:    240 25% 97%;
+    --popover:            235 28% 13%;
+    --popover-foreground: 240 25% 97%;
+    --secondary:          235 20% 16%;
+    --muted:              235 16% 20%;
+    --muted-foreground:   240 12% 68%;
+    --accent:             235 16% 20%;
+    --border:             235 16% 20%;
+    --input:              235 20% 16%;
+    --bg:     #090b16;
+    --s1:     #101424;
+    --s2:     #14182a;
+    --s3:     #1a1f36;
+    --b1:     #31375a;
+    --b2:     #4b5280;
+    --tx:     #eef2ff;
+    --tx2:    #b4bdf5;
+    --tx3:    #7c86c9;
+    --glow-1: rgba(99, 102, 241, 0.18);
+    --glow-2: rgba(168, 85, 247, 0.14);
+    --grid-line: rgba(165, 180, 252, 0.08);
+  }
+
+  :root[data-surface="nebula"] {
+    --app-bg-image:
+      radial-gradient(circle at top left, var(--glow-1), transparent 42%),
+      radial-gradient(circle at 82% 12%, var(--glow-2), transparent 34%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+    --app-bg-size: cover;
+    --app-bg-position: center;
+  }
+
+  :root[data-surface="grid"] {
+    --app-bg-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      radial-gradient(circle at top left, var(--glow-1), transparent 44%);
+    --app-bg-size: 24px 24px, 24px 24px, cover;
+    --app-bg-position: center, center, center;
+  }
+
+  :root[data-surface="flat"] {
+    --app-bg-image: linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0));
+    --app-bg-size: cover;
+    --app-bg-position: center;
   }
 }
 
@@ -53,12 +222,27 @@
     font-family: 'DM Sans', sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow: hidden; /* Tauri window - no body scroll */
+    background-color: var(--bg);
+    background-image: var(--app-bg-image);
+    background-size: var(--app-bg-size);
+    background-position: var(--app-bg-position);
+    color-scheme: dark;
+    transition: background-color 180ms ease, color 180ms ease;
   }
 
   * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
   *::-webkit-scrollbar { width: 4px; height: 4px; }
   *::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
   *::-webkit-scrollbar-track { background: transparent; }
+
+  :root[data-motion="reduced"] *,
+  :root[data-motion="reduced"] *::before,
+  :root[data-motion="reduced"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {

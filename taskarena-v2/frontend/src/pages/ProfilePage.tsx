@@ -1,19 +1,60 @@
 import { useEffect, useMemo, useState } from "react"
-import { BookOpen } from "lucide-react"
+import { BookOpen, LayoutGrid, Sparkles } from "lucide-react"
 import PageHeader from "@/components/shared/PageHeader"
 import { useAIConfig, useProfile, useUpdateAIConfig, useUpdateProfile } from "@/hooks/useProfile"
 import { getLevel, getNextThreshold, getPrevThreshold } from "@/lib/xp"
 import { api } from "@/api/client"
 import { useUIStore } from "@/stores/uiStore"
+import { APP_SURFACE_OPTIONS, APP_THEME_OPTIONS } from "@/lib/appearance"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
+
+function ToggleRow({
+  label,
+  desc,
+  checked,
+  onToggle,
+}: {
+  label: string
+  desc: string
+  checked: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="text-[12px] text-tx font-medium">{label}</p>
+        <p className="text-[10px] text-tx3">{desc}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
+          checked ? "bg-blue-500" : "bg-s3 border border-b1"
+        }`}
+        aria-pressed={checked}
+      >
+        <span
+          className={`block w-4 h-4 rounded-full bg-white shadow transition-transform mx-1 ${
+            checked ? "translate-x-4" : "translate-x-0"
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
 
 export default function ProfilePage() {
   const profileQuery = useProfile()
   const aiConfigQuery = useAIConfig()
   const updateProfile = useUpdateProfile()
   const updateAI = useUpdateAIConfig()
-  const { preferences, setPreference } = useUIStore()
+  const appearance = useUIStore((state) => state.appearance)
+  const preferences = useUIStore((state) => state.preferences)
+  const setTheme = useUIStore((state) => state.setTheme)
+  const setSurfaceStyle = useUIStore((state) => state.setSurfaceStyle)
+  const setReducedMotion = useUIStore((state) => state.setReducedMotion)
+  const setPreference = useUIStore((state) => state.setPreference)
 
   const meQuery = useQuery({
     queryKey: ["leaderboard", "me"],
@@ -51,7 +92,7 @@ export default function ProfilePage() {
 
   return (
     <div className="animate-fadeUp">
-      <PageHeader title="Profile" subtitle="Manage account, AI settings, and preferences." />
+      <PageHeader title="Profile" subtitle="Manage account, AI settings, appearance, and preferences." />
       <div className="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-3">
         <aside className="rounded-[10px] border border-b1 bg-s1 p-4">
           <div className="w-[68px] h-[68px] rounded-[12px] bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
@@ -162,6 +203,82 @@ export default function ProfilePage() {
           </div>
 
           <div className="rounded-[10px] border border-b1 bg-s1 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-blue-300" />
+              <h3 className="text-[13px] font-semibold">Appearance</h3>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-medium text-tx2 mb-2">Theme Palette</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                {APP_THEME_OPTIONS.map((option) => {
+                  const isActive = appearance.theme === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setTheme(option.id)}
+                      className={`rounded-[10px] border p-3 text-left transition-colors ${
+                        isActive
+                          ? "border-blue-500/40 bg-[var(--bd)]"
+                          : "border-b1 bg-s2 hover:bg-s3"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-2">
+                        {option.preview.map((color) => (
+                          <span
+                            key={color}
+                            className="w-3 h-3 rounded-full border border-white/10"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[12px] font-medium text-tx">{option.label}</p>
+                      <p className="mt-1 text-[10px] text-tx3">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <LayoutGrid className="w-3.5 h-3.5 text-tx2" />
+                <p className="text-[11px] font-medium text-tx2">Background Style</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {APP_SURFACE_OPTIONS.map((option) => {
+                  const isActive = appearance.surfaceStyle === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setSurfaceStyle(option.id)}
+                      className={`rounded-[9px] border px-3 py-2 text-left transition-colors ${
+                        isActive
+                          ? "border-blue-500/40 bg-[var(--bd)]"
+                          : "border-b1 bg-s2 hover:bg-s3"
+                      }`}
+                    >
+                      <p className="text-[12px] font-medium text-tx">{option.label}</p>
+                      <p className="mt-1 text-[10px] text-tx3">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <ToggleRow
+                label="Reduce Motion"
+                desc="Tone down interface animations and transitions."
+                checked={appearance.reducedMotion}
+                onToggle={() => setReducedMotion(!appearance.reducedMotion)}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[10px] border border-b1 bg-s1 p-4">
             <h3 className="text-[13px] font-semibold mb-3">Preferences</h3>
             <div className="space-y-3">
               {([
@@ -169,25 +286,13 @@ export default function ProfilePage() {
                 { key: "soundEffects" as const, label: "Sound Effects", desc: "Audio feedback on actions" },
                 { key: "autoIndexFiles" as const, label: "Auto-index Files", desc: "Index new files automatically on upload" },
               ]).map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[12px] text-tx font-medium">{label}</p>
-                    <p className="text-[10px] text-tx3">{desc}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPreference(key, !preferences[key])}
-                    className={`w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
-                      preferences[key] ? "bg-blue-500" : "bg-s3 border border-b1"
-                    }`}
-                  >
-                    <span
-                      className={`block w-4 h-4 rounded-full bg-white shadow transition-transform mx-1 ${
-                        preferences[key] ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleRow
+                  key={key}
+                  label={label}
+                  desc={desc}
+                  checked={preferences[key]}
+                  onToggle={() => setPreference(key, !preferences[key])}
+                />
               ))}
             </div>
           </div>
@@ -195,8 +300,16 @@ export default function ProfilePage() {
           <div className="rounded-[10px] border border-b1 bg-s1 p-4">
             <h3 className="text-[13px] font-semibold mb-1">Help & Onboarding</h3>
             <p className="text-[11px] text-tx3 mb-3">
-              Replay the setup wizard and feature tour at any time.
+              Control startup guidance and replay the setup wizard any time.
             </p>
+            <div className="mb-3">
+              <ToggleRow
+                label="Show Tutorial On Startup"
+                desc="Turn this off to stop automatic onboarding prompts when the app launches."
+                checked={preferences.showStartupTutorial}
+                onToggle={() => setPreference("showStartupTutorial", !preferences.showStartupTutorial)}
+              />
+            </div>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent("restart-tutorial"))}

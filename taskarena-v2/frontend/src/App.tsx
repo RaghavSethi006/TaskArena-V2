@@ -56,19 +56,22 @@ function needsAISetup(config: AIConfig): boolean {
 }
 
 function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { hasSeenOnboarding, setHasSeenOnboarding, hasHydrated } = useUIStore()
+  const hasSeenOnboarding = useUIStore((state) => state.hasSeenOnboarding)
+  const setHasSeenOnboarding = useUIStore((state) => state.setHasSeenOnboarding)
+  const hasHydrated = useUIStore((state) => state.hasHydrated)
+  const showStartupTutorial = useUIStore((state) => state.preferences.showStartupTutorial)
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState<OnboardingStepId>("welcome")
   const [aiPrompted, setAiPrompted] = useState(false)
 
   useEffect(() => {
-    if (!hasHydrated || hasSeenOnboarding) return
+    if (!hasHydrated || hasSeenOnboarding || !showStartupTutorial) return
     setWizardStep("welcome")
     setShowWizard(true)
-  }, [hasHydrated, hasSeenOnboarding])
+  }, [hasHydrated, hasSeenOnboarding, showStartupTutorial])
 
   useEffect(() => {
-    if (!hasHydrated) return
+    if (!hasHydrated || !showStartupTutorial) return
 
     let active = true
     const checkAISetup = async () => {
@@ -89,7 +92,7 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
     return () => {
       active = false
     }
-  }, [hasHydrated, hasSeenOnboarding, aiPrompted])
+  }, [hasHydrated, hasSeenOnboarding, aiPrompted, showStartupTutorial])
 
   // Also listen for the "restart-tutorial" custom event fired from ProfilePage
   useEffect(() => {
@@ -119,6 +122,21 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   )
 }
 
+function AppearanceEffect() {
+  const theme = useUIStore((state) => state.appearance.theme)
+  const surfaceStyle = useUIStore((state) => state.appearance.surfaceStyle)
+  const reducedMotion = useUIStore((state) => state.appearance.reducedMotion)
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.theme = theme
+    root.dataset.surface = surfaceStyle
+    root.dataset.motion = reducedMotion ? "reduced" : "full"
+  }, [theme, surfaceStyle, reducedMotion])
+
+  return null
+}
+
 export default function App() {
   const [backendReady, setBackendReady] = useState(false)
 
@@ -128,6 +146,7 @@ export default function App() {
         <StartupScreen onReady={() => setBackendReady(true)} />
       )}
       <BrowserRouter>
+        <AppearanceEffect />
         <GlobalTimerEffect />
         {backendReady && (
           <OnboardingGate>
