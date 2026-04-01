@@ -1,3 +1,18 @@
+export const APP_COLOR_MODE_OPTIONS = [
+  {
+    id: "dark",
+    label: "Dark",
+    description: "Cinematic low-light workspace.",
+  },
+  {
+    id: "light",
+    label: "Light",
+    description: "Bright canvas with softer panels.",
+  },
+] as const
+
+export type AppColorMode = (typeof APP_COLOR_MODE_OPTIONS)[number]["id"]
+
 export const APP_THEME_OPTIONS = [
   {
     id: "obsidian",
@@ -52,3 +67,18 @@ export const APP_SURFACE_OPTIONS = [
 ] as const
 
 export type AppSurfaceStyle = (typeof APP_SURFACE_OPTIONS)[number]["id"]
+
+export const APP_SIDEBAR_OPTIONS = [
+  {
+    id: "solid",
+    label: "Solid",
+    description: "Classic anchored navigation panel.",
+  },
+  {
+    id: "frosted",
+    label: "Frosted Glass",
+    description: "Blurred translucent sidebar with depth.",
+  },
+] as const
+
+export type AppSidebarStyle = (typeof APP_SIDEBAR_OPTIONS)[number]["id"]

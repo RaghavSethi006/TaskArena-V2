@@ -5,7 +5,7 @@ import { useAIConfig, useProfile, useUpdateAIConfig, useUpdateProfile } from "@/
 import { getLevel, getNextThreshold, getPrevThreshold } from "@/lib/xp"
 import { api } from "@/api/client"
 import { useUIStore } from "@/stores/uiStore"
-import { APP_SURFACE_OPTIONS, APP_THEME_OPTIONS } from "@/lib/appearance"
+import { APP_COLOR_MODE_OPTIONS, APP_SIDEBAR_OPTIONS, APP_SURFACE_OPTIONS, APP_THEME_OPTIONS } from "@/lib/appearance"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 
@@ -50,7 +50,9 @@ export default function ProfilePage() {
   const updateProfile = useUpdateProfile()
   const updateAI = useUpdateAIConfig()
   const appearance = useUIStore((state) => state.appearance)
+  const setColorMode = useUIStore((state) => state.setColorMode)
   const preferences = useUIStore((state) => state.preferences)
+  const setSidebarStyle = useUIStore((state) => state.setSidebarStyle)
   const setTheme = useUIStore((state) => state.setTheme)
   const setSurfaceStyle = useUIStore((state) => state.setSurfaceStyle)
   const setReducedMotion = useUIStore((state) => state.setReducedMotion)
@@ -209,6 +211,30 @@ export default function ProfilePage() {
             </div>
 
             <div>
+              <p className="text-[11px] font-medium text-tx2 mb-2">Color Mode</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {APP_COLOR_MODE_OPTIONS.map((option) => {
+                  const isActive = appearance.colorMode === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setColorMode(option.id)}
+                      className={`rounded-[10px] border px-3 py-2.5 text-left transition-colors ${
+                        isActive
+                          ? "border-blue-500/40 bg-[var(--bd)]"
+                          : "border-b1 bg-s2 hover:bg-s3"
+                      }`}
+                    >
+                      <p className="text-[12px] font-medium text-tx">{option.label}</p>
+                      <p className="mt-1 text-[10px] text-tx3">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4">
               <p className="text-[11px] font-medium text-tx2 mb-2">Theme Palette</p>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                 {APP_THEME_OPTIONS.map((option) => {
@@ -233,6 +259,30 @@ export default function ProfilePage() {
                           />
                         ))}
                       </div>
+                      <p className="text-[12px] font-medium text-tx">{option.label}</p>
+                      <p className="mt-1 text-[10px] text-tx3">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-[11px] font-medium text-tx2 mb-2">Sidebar Style</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {APP_SIDEBAR_OPTIONS.map((option) => {
+                  const isActive = appearance.sidebarStyle === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setSidebarStyle(option.id)}
+                      className={`rounded-[9px] border px-3 py-2 text-left transition-colors ${
+                        isActive
+                          ? "border-blue-500/40 bg-[var(--bd)]"
+                          : "border-b1 bg-s2 hover:bg-s3"
+                      }`}
+                    >
                       <p className="text-[12px] font-medium text-tx">{option.label}</p>
                       <p className="mt-1 text-[10px] text-tx3">{option.description}</p>
                     </button>

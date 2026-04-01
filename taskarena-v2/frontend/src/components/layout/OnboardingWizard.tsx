@@ -18,6 +18,7 @@ import { useCreateCourse } from "@/hooks/useNotes"
 import { useCreateTask } from "@/hooks/useTasks"
 import { useUpdateProfile, useUpdateAIConfig } from "@/hooks/useProfile"
 import { useUIStore } from "@/stores/uiStore"
+import AppLogo from "@/components/branding/AppLogo"
 import { cn } from "@/lib/utils"
 
 const COURSE_COLORS = [
@@ -227,9 +228,7 @@ export default function OnboardingWizard({ onClose, initialStep }: OnboardingWiz
         {/* ── WELCOME ── */}
         {step === "welcome" && (
           <div className="p-8 text-center">
-            <div className="w-16 h-16 mx-auto rounded-[14px] bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center mb-5">
-              <span className="text-[24px] font-bold text-white font-mono">TA</span>
-            </div>
+              <AppLogo className="mx-auto mb-5 h-16 w-16" imageClassName="p-2" />
             <h1 className="text-[22px] font-bold text-tx mb-2">Welcome to TaskArena</h1>
             <p className="text-[13px] text-tx2 leading-relaxed mb-2">
               Your personal study OS. Manage tasks, index your notes, chat with an AI tutor that

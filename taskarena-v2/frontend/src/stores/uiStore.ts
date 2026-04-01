@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { AppSurfaceStyle, AppThemeId } from "@/lib/appearance"
+import type { AppColorMode, AppSidebarStyle, AppSurfaceStyle, AppThemeId } from "@/lib/appearance"
 
 interface UIStore {
   sidebarCollapsed: boolean
@@ -8,12 +8,16 @@ interface UIStore {
   setSidebarCollapsed: (v: boolean) => void
 
   appearance: {
+    colorMode: AppColorMode
     theme: AppThemeId
     surfaceStyle: AppSurfaceStyle
+    sidebarStyle: AppSidebarStyle
     reducedMotion: boolean
   }
+  setColorMode: (colorMode: AppColorMode) => void
   setTheme: (theme: AppThemeId) => void
   setSurfaceStyle: (surfaceStyle: AppSurfaceStyle) => void
+  setSidebarStyle: (sidebarStyle: AppSidebarStyle) => void
   setReducedMotion: (v: boolean) => void
 
   preferences: {
@@ -39,14 +43,20 @@ export const useUIStore = create<UIStore>()(
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
       appearance: {
+        colorMode: "dark",
         theme: "obsidian",
         surfaceStyle: "nebula",
+        sidebarStyle: "solid",
         reducedMotion: false,
       },
+      setColorMode: (colorMode) =>
+        set((s) => ({ appearance: { ...s.appearance, colorMode } })),
       setTheme: (theme) =>
         set((s) => ({ appearance: { ...s.appearance, theme } })),
       setSurfaceStyle: (surfaceStyle) =>
         set((s) => ({ appearance: { ...s.appearance, surfaceStyle } })),
+      setSidebarStyle: (sidebarStyle) =>
+        set((s) => ({ appearance: { ...s.appearance, sidebarStyle } })),
       setReducedMotion: (v) =>
         set((s) => ({ appearance: { ...s.appearance, reducedMotion: v } })),
 
