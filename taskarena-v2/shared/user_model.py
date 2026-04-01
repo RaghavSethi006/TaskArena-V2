@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from shared.models_base import Base
 
 if TYPE_CHECKING:
-    from features.chatbot.models import ChatConversation
+    from features.chatbot.models import ChatConversation, ChatGroup
     from features.notes.models import Course
     from features.quiz.models import QuizAttempt
     from features.schedule.models import ScheduleEvent
@@ -39,6 +39,9 @@ class User(Base):
     )
     chat_conversations: Mapped[list["ChatConversation"]] = relationship(
         "ChatConversation", back_populates="user", cascade="all, delete-orphan"
+    )
+    chat_groups: Mapped[list["ChatGroup"]] = relationship(
+        "ChatGroup", back_populates="user", cascade="all, delete-orphan"
     )
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(
         "QuizAttempt", back_populates="user", cascade="all, delete-orphan"

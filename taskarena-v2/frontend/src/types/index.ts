@@ -71,12 +71,21 @@ export interface File {
 export interface Conversation {
   id: number
   title: string | null
+  group_id: number | null
   context_course_id: number | null
   context_folder_id: number | null
   context_file_id: number | null
   created_at: string
   updated_at: string
   message_count: number
+}
+
+export interface ChatGroup {
+  id: number
+  name: string
+  created_at: string
+  updated_at: string
+  conversation_count: number
 }
 
 export interface Message {
